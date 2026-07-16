@@ -204,27 +204,49 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
       }
       if (extension.isEmpty) {
         try {
-          final response = await Dio().head(
+          final response = await Dio().get<ResponseBody>(
             signedUrl,
             options: Options(
+              responseType: ResponseType.stream,
+              headers: {
+                'Range': 'bytes=0-15',
+              },
               followRedirects: true,
               validateStatus: (status) => status != null && status < 500,
             ),
           );
+
           final contentType = response.headers.value('content-type')?.toLowerCase() ?? '';
-          if (contentType.contains('pdf')) {
-            extension = 'pdf';
-          } else if (contentType.contains('image/png')) {
-            extension = 'png';
-          } else if (contentType.contains('image/jpeg') || contentType.contains('image/jpg')) {
-            extension = 'jpg';
-          } else if (contentType.contains('image/gif')) {
-            extension = 'gif';
-          } else if (contentType.contains('image/webp')) {
-            extension = 'webp';
+          final bytesList = await response.data!.stream.first;
+          final bytes = List<int>.from(bytesList);
+          
+          if (bytes.length >= 4) {
+            if (bytes[0] == 0x25 && bytes[1] == 0x50 && bytes[2] == 0x44 && bytes[3] == 0x46) {
+              extension = 'pdf';
+            } else if (bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47) {
+              extension = 'png';
+            } else if (bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF) {
+              extension = 'jpg';
+            } else if (bytes[0] == 0x47 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x38) {
+              extension = 'gif';
+            }
+          }
+
+          if (extension.isEmpty) {
+            if (contentType.contains('pdf')) {
+              extension = 'pdf';
+            } else if (contentType.contains('image/png')) {
+              extension = 'png';
+            } else if (contentType.contains('image/jpeg') || contentType.contains('image/jpg')) {
+              extension = 'jpg';
+            } else if (contentType.contains('image/gif')) {
+              extension = 'gif';
+            } else if (contentType.contains('image/webp')) {
+              extension = 'webp';
+            }
           }
         } catch (e) {
-          debugPrint('HEAD request failed to determine file type for download: $e');
+          debugPrint('Range GET request failed to determine file type for download: $e');
         }
       }
       if (extension.isEmpty) {
