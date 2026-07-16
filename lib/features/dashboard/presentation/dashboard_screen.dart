@@ -560,7 +560,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                               const SizedBox(height: 20),
                               // Primary gold CTA
                               ElevatedButton.icon(
-                                onPressed: () => context.push('/support/renew'),
+                                onPressed: () => context.push('/action_required', extra: _alerts),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: TerraTheme.gold500,
                                   foregroundColor: TerraTheme.charcoal800,
