@@ -302,21 +302,22 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
             titleSpacing: 16,
             title: Row(
               children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: const BoxDecoration(
-                    color: TerraTheme.olive900,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: Text('PR',
-                        style: GoogleFonts.nunitoSans(
-                          color: TerraTheme.gold500,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                        )),
-                  ),
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: TerraTheme.olive900,
+                  backgroundImage: (_company?['logo_url'] != null && _company!['logo_url'].toString().isNotEmpty)
+                      ? NetworkImage(_company!['logo_url'])
+                      : null,
+                  child: (_company?['logo_url'] == null || _company!['logo_url'].toString().isEmpty)
+                      ? Center(
+                          child: Text('PR',
+                              style: GoogleFonts.nunitoSans(
+                                color: TerraTheme.gold500,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              )),
+                        )
+                      : null,
                 ),
                 const SizedBox(width: 12),
                 Text('PRO Services',

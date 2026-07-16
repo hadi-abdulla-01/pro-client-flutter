@@ -382,14 +382,19 @@ class _EmployeeDetailScreenState extends ConsumerState<EmployeeDetailScreen> {
                     CircleAvatar(
                       radius: 36,
                       backgroundColor: const Color(0xffe8ecde),
-                      child: Text(
-                        "${_employee!['first_name'][0]}${_employee!['last_name'][0]}".toUpperCase(),
-                        style: const TextStyle(
-                          color: Color(0xff3d4a2a),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20,
-                        ),
-                      ),
+                      backgroundImage: (_employee!['photo_url'] != null && _employee!['photo_url'].toString().isNotEmpty)
+                          ? NetworkImage(_employee!['photo_url'])
+                          : null,
+                      child: (_employee!['photo_url'] == null || _employee!['photo_url'].toString().isEmpty)
+                          ? Text(
+                              "${_employee!['first_name'][0]}${_employee!['last_name'][0]}".toUpperCase(),
+                              style: const TextStyle(
+                                color: Color(0xff3d4a2a),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 20,
+                              ),
+                            )
+                          : null,
                     ),
                     const SizedBox(height: 12),
                     Text(
@@ -404,25 +409,53 @@ class _EmployeeDetailScreenState extends ConsumerState<EmployeeDetailScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        Column(
-                          children: [
-                            const Icon(Icons.phone, color: Colors.white70, size: 18),
-                            const SizedBox(height: 4),
-                            Text(
-                              _employee!['phone'] ?? 'N/A',
-                              style: const TextStyle(color: Colors.white, fontSize: 11),
+                        InkWell(
+                          onTap: (_employee!['phone'] != null && _employee!['phone'].toString().isNotEmpty && _employee!['phone'] != 'N/A')
+                              ? () async {
+                                  final Uri url = Uri.parse("tel:${_employee!['phone']}");
+                                  if (await canLaunchUrl(url)) {
+                                    await launchUrl(url);
+                                  }
+                                }
+                              : null,
+                          borderRadius: BorderRadius.circular(8),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            child: Column(
+                              children: [
+                                const Icon(Icons.phone, color: Colors.white70, size: 18),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _employee!['phone'] ?? 'N/A',
+                                  style: const TextStyle(color: Colors.white, fontSize: 11),
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
-                        Column(
-                          children: [
-                            const Icon(Icons.email, color: Colors.white70, size: 18),
-                            const SizedBox(height: 4),
-                            Text(
-                              _employee!['email'] ?? 'N/A',
-                              style: const TextStyle(color: Colors.white, fontSize: 11),
+                        InkWell(
+                          onTap: (_employee!['email'] != null && _employee!['email'].toString().isNotEmpty && _employee!['email'] != 'N/A')
+                              ? () async {
+                                  final Uri url = Uri.parse("mailto:${_employee!['email']}");
+                                  if (await canLaunchUrl(url)) {
+                                    await launchUrl(url);
+                                  }
+                                }
+                              : null,
+                          borderRadius: BorderRadius.circular(8),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            child: Column(
+                              children: [
+                                const Icon(Icons.email, color: Colors.white70, size: 18),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _employee!['email'] ?? 'N/A',
+                                  style: const TextStyle(color: Colors.white, fontSize: 11),
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
                       ],
                     ),

@@ -149,6 +149,13 @@ class _ActionRequiredScreenState extends ConsumerState<ActionRequiredScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final companies = ref.watch(availableCompaniesProvider);
+    final selectedId = ref.watch(selectedCompanyIdProvider);
+    final activeCompany = selectedId != null
+        ? companies.firstWhere((c) => c['id'] == selectedId, orElse: () => <String, dynamic>{})
+        : <String, dynamic>{};
+    final logoUrl = activeCompany['logo_url'];
+
     return Scaffold(
       backgroundColor: TerraTheme.cream50,
       appBar: AppBar(
@@ -161,21 +168,22 @@ class _ActionRequiredScreenState extends ConsumerState<ActionRequiredScreen> {
         ),
         title: Row(
           children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: const BoxDecoration(
-                color: TerraTheme.olive900,
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Text('PR',
-                    style: GoogleFonts.nunitoSans(
-                      color: TerraTheme.gold500,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    )),
-              ),
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: TerraTheme.olive900,
+              backgroundImage: (logoUrl != null && logoUrl.toString().isNotEmpty)
+                  ? NetworkImage(logoUrl)
+                  : null,
+              child: (logoUrl == null || logoUrl.toString().isEmpty)
+                  ? Center(
+                      child: Text('PR',
+                          style: GoogleFonts.nunitoSans(
+                            color: TerraTheme.gold500,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          )),
+                    )
+                  : null,
             ),
             const SizedBox(width: 12),
             Text('Action Required',
