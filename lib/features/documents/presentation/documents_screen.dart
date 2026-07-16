@@ -184,14 +184,51 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
         await saveDir.create(recursive: true);
       }
 
-      String extension = doc['path'].contains('.') ? doc['path'].split('.').last : '';
-      if (extension.isEmpty || extension.length > 4) {
+      String extension = '';
+      final pathStr = (doc['path'] ?? '').toString();
+      if (pathStr.contains('.')) {
+        final ext = pathStr.split('.').last.toLowerCase();
+        if (['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'doc', 'docx'].contains(ext)) {
+          extension = ext;
+        }
+      }
+      if (extension.isEmpty) {
         final nameStr = (doc['name'] ?? '').toString().toLowerCase();
         if (nameStr.endsWith('.pdf')) {
           extension = 'pdf';
-        } else {
+        } else if (nameStr.endsWith('.png')) {
+          extension = 'png';
+        } else if (nameStr.endsWith('.jpeg') || nameStr.endsWith('.jpg')) {
           extension = 'jpg';
         }
+      }
+      if (extension.isEmpty) {
+        try {
+          final response = await Dio().head(
+            signedUrl,
+            options: Options(
+              followRedirects: true,
+              validateStatus: (status) => status != null && status < 500,
+            ),
+          );
+          final contentType = response.headers.value('content-type')?.toLowerCase() ?? '';
+          if (contentType.contains('pdf')) {
+            extension = 'pdf';
+          } else if (contentType.contains('image/png')) {
+            extension = 'png';
+          } else if (contentType.contains('image/jpeg') || contentType.contains('image/jpg')) {
+            extension = 'jpg';
+          } else if (contentType.contains('image/gif')) {
+            extension = 'gif';
+          } else if (contentType.contains('image/webp')) {
+            extension = 'webp';
+          }
+        } catch (e) {
+          debugPrint('HEAD request failed to determine file type for download: $e');
+        }
+      }
+      if (extension.isEmpty) {
+        extension = 'jpg';
       }
 
       final String fileName = "${doc['name'] ?? 'doc'}_${DateTime.now().millisecondsSinceEpoch}.$extension";
@@ -449,7 +486,7 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Document Vault',
+                  Text('Company Documents',
                       style: GoogleFonts.nunitoSans(
                         fontSize: 24,
                         fontWeight: FontWeight.w700,
@@ -495,13 +532,14 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
                           ),
                           const SizedBox(width: 8),
                         ],
-                        // Corporate: 'employee' group | Individual: 'relative' group
-                        _CategoryChip(
-                          label: isIndividual ? 'Relative Docs' : 'Employee Docs',
-                          isSelected: _selectedCategoryGroup == (isIndividual ? 'relative' : 'employee'),
-                          onTap: () => setState(() =>
-                              _selectedCategoryGroup = isIndividual ? 'relative' : 'employee'),
-                        ),
+                        // Individual only: show Relative Docs
+                        if (isIndividual) ...[
+                          _CategoryChip(
+                            label: 'Relative Docs',
+                            isSelected: _selectedCategoryGroup == 'relative',
+                            onTap: () => setState(() => _selectedCategoryGroup = 'relative'),
+                          ),
+                        ],
                       ],
                     ),
                   ),

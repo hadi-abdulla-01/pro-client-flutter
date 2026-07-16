@@ -115,15 +115,51 @@ class _EmployeeDetailScreenState extends ConsumerState<EmployeeDetailScreen> {
         await saveDir.create(recursive: true);
       }
 
-      String extension = path.contains('.') ? path.split('.').last : '';
-      if (extension.isEmpty || extension.length > 4) {
+      String extension = '';
+      if (path.contains('.')) {
+        final ext = path.split('.').last.toLowerCase();
+        if (['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'doc', 'docx'].contains(ext)) {
+          extension = ext;
+        }
+      }
+      if (extension.isEmpty) {
         final typeStr = (doc['file_type'] ?? '').toString().toLowerCase();
         final nameStr = (doc['file_name'] ?? '').toString().toLowerCase();
         if (typeStr.contains('pdf') || nameStr.endsWith('.pdf')) {
           extension = 'pdf';
-        } else {
+        } else if (nameStr.endsWith('.png')) {
+          extension = 'png';
+        } else if (nameStr.endsWith('.jpeg') || nameStr.endsWith('.jpg')) {
           extension = 'jpg';
         }
+      }
+      if (extension.isEmpty) {
+        try {
+          final response = await Dio().head(
+            signedUrlRes,
+            options: Options(
+              followRedirects: true,
+              validateStatus: (status) => status != null && status < 500,
+            ),
+          );
+          final contentType = response.headers.value('content-type')?.toLowerCase() ?? '';
+          if (contentType.contains('pdf')) {
+            extension = 'pdf';
+          } else if (contentType.contains('image/png')) {
+            extension = 'png';
+          } else if (contentType.contains('image/jpeg') || contentType.contains('image/jpg')) {
+            extension = 'jpg';
+          } else if (contentType.contains('image/gif')) {
+            extension = 'gif';
+          } else if (contentType.contains('image/webp')) {
+            extension = 'webp';
+          }
+        } catch (e) {
+          debugPrint('HEAD request failed to determine file type for download: $e');
+        }
+      }
+      if (extension.isEmpty) {
+        extension = 'jpg';
       }
 
       final String fileName = "${doc['file_name'] ?? 'doc'}_${DateTime.now().millisecondsSinceEpoch}.$extension";
@@ -398,3 +434,4 @@ class _EmployeeDetailScreenState extends ConsumerState<EmployeeDetailScreen> {
     );
   }
 }
+

@@ -131,6 +131,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
               'doc': doc,
             });
           } else if (expiry.isBefore(thirtyDaysFromNow)) {
+            // Expiring soon: compliant but flagged
+            _compliantCount++;
             _alerts.add({
               'name': doc['file_name'] ?? doc['document_categories']['name'],
               'owner': ownerName,
