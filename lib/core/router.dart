@@ -44,9 +44,12 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/action_required',
-            builder: (context, state) {
+            pageBuilder: (context, state) {
               final alerts = state.extra as List<Map<String, dynamic>>? ?? [];
-              return ActionRequiredScreen(alerts: alerts);
+              return buildSlideTransitionPage(
+                child: ActionRequiredScreen(alerts: alerts),
+                state: state,
+              );
             },
           ),
           GoRoute(
@@ -59,9 +62,12 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: ':id',
-                builder: (context, state) {
+                pageBuilder: (context, state) {
                   final employeeId = state.pathParameters['id']!;
-                  return EmployeeDetailScreen(employeeId: employeeId);
+                  return buildSlideTransitionPage(
+                    child: EmployeeDetailScreen(employeeId: employeeId),
+                    state: state,
+                  );
                 },
               ),
             ],
@@ -72,7 +78,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: 'renew',
-                builder: (context, state) => const RenewalRequestScreen(),
+                pageBuilder: (context, state) => buildSlideTransitionPage(
+                  child: const RenewalRequestScreen(),
+                  state: state,
+                ),
               ),
             ],
           ),
@@ -85,6 +94,33 @@ final routerProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+CustomTransitionPage<void> buildSlideTransitionPage({
+  required Widget child,
+  required GoRouterState state,
+}) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 300),
+    reverseTransitionDuration: const Duration(milliseconds: 250),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      const begin = Offset(0.08, 0.0);
+      const end = Offset.zero;
+      const curve = Curves.easeInOutCubic;
+      var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+      var offsetAnimation = animation.drive(tween);
+      var fadeAnimation = CurvedAnimation(parent: animation, curve: Curves.easeIn);
+      return SlideTransition(
+        position: offsetAnimation,
+        child: FadeTransition(
+          opacity: fadeAnimation,
+          child: child,
+        ),
+      );
+    },
+  );
+}
 
 class AppShell extends ConsumerStatefulWidget {
   final Widget child;
@@ -134,7 +170,21 @@ class _AppShellState extends ConsumerState<AppShell> {
     final isIndividual = ref.watch(isIndividualProvider);
     
     return Scaffold(
-      body: widget.child,
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 250),
+        switchInCurve: Curves.easeInOutCubic,
+        switchOutCurve: Curves.easeInOutCubic,
+        transitionBuilder: (Widget child, Animation<double> animation) {
+          return FadeTransition(
+            opacity: animation,
+            child: child,
+          );
+        },
+        child: KeyedSubtree(
+          key: ValueKey(GoRouterState.of(context).uri.path),
+          child: widget.child,
+        ),
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) => _onTabTapped(context, index),

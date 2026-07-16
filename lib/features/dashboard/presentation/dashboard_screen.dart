@@ -456,7 +456,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                       const SizedBox(width: 10),
                       _StatCard(value: '$_totalDocs', label: 'TOTAL\nDOCUMENTS', borderColor: TerraTheme.primary),
                       const SizedBox(width: 10),
-                      _StatCard(value: '${_expiredCount.toString().padLeft(2, '0')}', label: 'EXPIRED\nDOCS', borderColor: TerraTheme.error),
+                      _StatCard(value: _expiredCount.toString().padLeft(2, '0'), label: 'EXPIRED\nDOCS', borderColor: TerraTheme.error),
                     ],
                   ),
 
@@ -541,7 +541,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Text('Recent Activity',
+                              Text('Need Quick Renewal?',
                                   style: GoogleFonts.nunitoSans(
                                     fontSize: 22,
                                     fontWeight: FontWeight.w800,
@@ -560,7 +560,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                               const SizedBox(height: 20),
                               // Primary gold CTA
                               ElevatedButton.icon(
-                                onPressed: () {},
+                                onPressed: () => context.push('/support/renew'),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: TerraTheme.gold500,
                                   foregroundColor: TerraTheme.charcoal800,
@@ -703,7 +703,8 @@ class _StatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+        height: 96,
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
@@ -711,6 +712,7 @@ class _StatCard extends StatelessWidget {
           border: Border(bottom: BorderSide(color: borderColor, width: 4)),
         ),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(value,
                 style: GoogleFonts.nunitoSans(
