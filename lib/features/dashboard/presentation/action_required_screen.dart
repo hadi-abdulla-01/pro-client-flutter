@@ -29,15 +29,45 @@ class _ActionRequiredScreenState extends ConsumerState<ActionRequiredScreen> {
       final docCatId = doc['category_id'];
       final employeeId = doc['employee_id'];
 
+      // Spam prevention check
+      var checkQuery = supabase
+          .from('renewal_requests')
+          .select('id')
+          .eq('company_id', companyId)
+          .eq('document_category_id', docCatId)
+          .inFilter('status', ['pending', 'requested', 'in_progress']);
+
+      if (employeeId != null) {
+        checkQuery = checkQuery.eq('employee_id', employeeId);
+      } else {
+        checkQuery = checkQuery.filter('employee_id', 'is', null);
+      }
+
+      final existing = await checkQuery;
+      if (existing.isNotEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('A renewal request for this document is already active.'),
+              backgroundColor: TerraTheme.error,
+            ),
+          );
+        }
+        return;
+      }
+
       await supabase.from('renewal_requests').insert({
         'company_id': companyId,
         'employee_id': employeeId,
         'document_category_id': docCatId,
         'details': 'Automated renewal request via app for ${alert['name']}',
-        'status': 'pending',
+        'status': 'requested',
       });
 
       if (mounted) {
+        setState(() {
+          alert['renewalStatus'] = 'requested';
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Renewal request submitted for ${alert['name']}'),
@@ -174,25 +204,48 @@ class _ActionRequiredScreenState extends ConsumerState<ActionRequiredScreen> {
                         ),
                       ],
                       const SizedBox(height: 16),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 36,
-                        child: ElevatedButton(
-                          onPressed: () => _submitRenewRequest(alert),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: TerraTheme.primary,
-                            padding: EdgeInsets.zero,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          ),
-                          child: Text(
-                            'Renew Request',
-                            style: GoogleFonts.nunitoSans(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
+                      Builder(
+                        builder: (context) {
+                          final renewalStatus = alert['renewalStatus'];
+                          final hasActiveRequest = renewalStatus != null;
+                          
+                          String buttonText = 'Renew Request';
+                          Color buttonBgColor = TerraTheme.primary;
+                          Color buttonTextColor = Colors.white;
+                          
+                          if (renewalStatus == 'pending' || renewalStatus == 'requested') {
+                            buttonText = 'Requested';
+                            buttonBgColor = TerraTheme.neutral500.withOpacity(0.12);
+                            buttonTextColor = TerraTheme.neutral500;
+                          } else if (renewalStatus == 'in_progress') {
+                            buttonText = 'In Progress';
+                            buttonBgColor = TerraTheme.gold500.withOpacity(0.15);
+                            buttonTextColor = TerraTheme.gold500;
+                          }
+
+                          return SizedBox(
+                            width: double.infinity,
+                            height: 36,
+                            child: ElevatedButton(
+                              onPressed: hasActiveRequest ? null : () => _submitRenewRequest(alert),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: buttonBgColor,
+                                foregroundColor: buttonTextColor,
+                                disabledBackgroundColor: buttonBgColor,
+                                disabledForegroundColor: buttonTextColor,
+                                padding: EdgeInsets.zero,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              child: Text(
+                                buttonText,
+                                style: GoogleFonts.nunitoSans(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
+                          );
+                        }
                       ),
                     ],
                   ),

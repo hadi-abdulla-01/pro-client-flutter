@@ -95,13 +95,40 @@ class _RenewalRequestScreenState extends ConsumerState<RenewalRequestScreen> {
       final companyId = profile['company_id'];
 
       if (companyId != null) {
+        // Spam prevention check
+        var checkQuery = supabase
+            .from('renewal_requests')
+            .select('id')
+            .eq('company_id', companyId)
+            .eq('document_category_id', _selectedCategoryId!)
+            .inFilter('status', ['pending', 'requested', 'in_progress']);
+
+        if (_selectedEmployeeId != null) {
+          checkQuery = checkQuery.eq('employee_id', _selectedEmployeeId!);
+        } else {
+          checkQuery = checkQuery.filter('employee_id', 'is', null);
+        }
+
+        final existing = await checkQuery;
+        if (existing.isNotEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('A renewal request for this document is already active (requested or in progress).'),
+                backgroundColor: Color(0xffef4444),
+              ),
+            );
+          }
+          return;
+        }
+
         await supabase.from('renewal_requests').insert([
           {
             'company_id': companyId,
             'employee_id': _selectedEmployeeId, // Null if company level
             'document_category_id': _selectedCategoryId,
             'details': _detailsController.text.trim(),
-            'status': 'pending',
+            'status': 'requested',
           }
         ]);
 

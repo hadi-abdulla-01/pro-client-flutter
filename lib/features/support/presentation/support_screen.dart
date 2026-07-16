@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -331,7 +332,7 @@ class _SupportScreenState extends ConsumerState<SupportScreen> {
                         iconBg: const Color(0x1AC9A227),
                         iconColor: TerraTheme.gold500,
                         label: 'Raise Renewal',
-                        onTap: () {},
+                        onTap: () => context.push('/support/renew'),
                       ),
                       _ChannelCard(
                         icon: Icons.emergency_outlined,

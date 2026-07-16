@@ -100,6 +100,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           empDocs = empDocsRes;
         }
 
+        // Fetch active renewal requests for mapping
+        final renewalsRes = await supabase
+            .from('renewal_requests')
+            .select('id, employee_id, document_category_id, status')
+            .inFilter('company_id', targetCompanyIds)
+            .inFilter('status', ['pending', 'requested', 'in_progress']);
+        final List renewals = renewalsRes;
+
         _totalDocs = compDocs.length + empDocs.length;
 
         final today = DateTime.now();
@@ -120,6 +128,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
               ? "${doc['employees']['first_name']} ${doc['employees']['last_name']}"
               : "Company Level";
 
+          // Find matching active renewal request
+          Map<String, dynamic>? activeRenewal;
+          for (var r in renewals) {
+            if (r['document_category_id'] == doc['category_id'] &&
+                r['employee_id'] == doc['employee_id']) {
+              activeRenewal = r;
+              break;
+            }
+          }
+          final renewalStatus = activeRenewal != null ? activeRenewal['status'] : null;
+
           if (expiry.isBefore(today)) {
             _expiredCount++;
             _alerts.add({
@@ -129,6 +148,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
               'daysLeft': expiry.difference(today).inDays,
               'status': 'expired',
               'doc': doc,
+              'renewalStatus': renewalStatus,
             });
           } else if (expiry.isBefore(thirtyDaysFromNow)) {
             // Expiring soon: compliant but flagged
@@ -140,6 +160,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
               'daysLeft': expiry.difference(today).inDays,
               'status': 'expiring_soon',
               'doc': doc,
+              'renewalStatus': renewalStatus,
             });
           } else {
             _compliantCount++;
@@ -185,15 +206,45 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
       final docCatId = doc['category_id'];
       final employeeId = doc['employee_id'];
 
+      // Spam prevention check
+      var checkQuery = supabase
+          .from('renewal_requests')
+          .select('id')
+          .eq('company_id', companyId)
+          .eq('document_category_id', docCatId)
+          .inFilter('status', ['pending', 'requested', 'in_progress']);
+
+      if (employeeId != null) {
+        checkQuery = checkQuery.eq('employee_id', employeeId);
+      } else {
+        checkQuery = checkQuery.filter('employee_id', 'is', null);
+      }
+
+      final existing = await checkQuery;
+      if (existing.isNotEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('A renewal request for this document is already active.'),
+              backgroundColor: TerraTheme.error,
+            ),
+          );
+        }
+        return;
+      }
+
       await supabase.from('renewal_requests').insert({
         'company_id': companyId,
         'employee_id': employeeId,
         'document_category_id': docCatId,
         'details': 'Automated renewal request via app for ${alert['name']}',
-        'status': 'pending',
+        'status': 'requested',
       });
 
       if (mounted) {
+        setState(() {
+          alert['renewalStatus'] = 'requested';
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Renewal request submitted for ${alert['name']}'),
@@ -696,6 +747,26 @@ class _ExpiryCard extends StatelessWidget {
     final statusColor = isExpired ? TerraTheme.error : TerraTheme.warning;
     final statusLabel = isExpired ? 'EXPIRED' : 'EXPIRING SOON';
 
+    final renewalStatus = alert['renewalStatus'];
+    final hasActiveRequest = renewalStatus != null;
+
+    String buttonText = 'Renew Request';
+    Color borderColor = TerraTheme.primary;
+    Color textColor = TerraTheme.primary;
+    Color? bgColor;
+
+    if (renewalStatus == 'pending' || renewalStatus == 'requested') {
+      buttonText = 'Requested';
+      borderColor = TerraTheme.neutral500;
+      textColor = TerraTheme.neutral500;
+      bgColor = TerraTheme.neutral500.withOpacity(0.08);
+    } else if (renewalStatus == 'in_progress') {
+      buttonText = 'In Progress';
+      borderColor = TerraTheme.gold500;
+      textColor = TerraTheme.gold500;
+      bgColor = TerraTheme.gold500.withOpacity(0.08);
+    }
+
     return Container(
       width: 220,
       padding: const EdgeInsets.all(16),
@@ -752,18 +823,19 @@ class _ExpiryCard extends StatelessWidget {
             width: double.infinity,
             height: 32,
             child: OutlinedButton(
-              onPressed: onRenew,
+              onPressed: hasActiveRequest ? null : onRenew,
               style: OutlinedButton.styleFrom(
                 padding: EdgeInsets.zero,
-                side: const BorderSide(color: TerraTheme.primary),
+                backgroundColor: bgColor,
+                side: BorderSide(color: borderColor),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
               child: Text(
-                'Renew Request',
+                buttonText,
                 style: GoogleFonts.nunitoSans(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: TerraTheme.primary,
+                  color: textColor,
                 ),
               ),
             ),
