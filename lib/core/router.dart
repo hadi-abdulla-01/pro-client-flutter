@@ -31,11 +31,35 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
-      GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginScreen(),
-      ),
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       ShellRoute(
+        pageBuilder: (context, state, child) {
+          return CustomTransitionPage<void>(
+            key: state.pageKey,
+            child: AppShell(child: child),
+            transitionDuration: const Duration(milliseconds: 260),
+            reverseTransitionDuration: const Duration(milliseconds: 220),
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+                  final offsetTween = Tween<Offset>(
+                    begin: const Offset(0.0, 0.08),
+                    end: Offset.zero,
+                  ).chain(CurveTween(curve: Curves.easeOutCubic));
+                  final fadeTween = Tween<double>(
+                    begin: 0.0,
+                    end: 1.0,
+                  ).chain(CurveTween(curve: Curves.easeOutCubic));
+
+                  return FadeTransition(
+                    opacity: animation.drive(fadeTween),
+                    child: SlideTransition(
+                      position: animation.drive(offsetTween),
+                      child: child,
+                    ),
+                  );
+                },
+          );
+        },
         builder: (context, state, child) => AppShell(child: child),
         routes: [
           GoRoute(
@@ -110,10 +134,7 @@ CustomTransitionPage<void> buildSlideTransitionPage({
       const curve = Curves.easeOutCubic;
       var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
       var offsetAnimation = animation.drive(tween);
-      return SlideTransition(
-        position: offsetAnimation,
-        child: child,
-      );
+      return SlideTransition(position: offsetAnimation, child: child);
     },
   );
 }
@@ -163,6 +184,15 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   @override
   Widget build(BuildContext context) {
+    final isLoading = ref.watch(companiesLoadingProvider);
+    if (isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xff316342)),
+        ),
+      );
+    }
+
     final isIndividual = ref.watch(isIndividualProvider);
 
     return Scaffold(
@@ -174,15 +204,31 @@ class _AppShellState extends ConsumerState<AppShell> {
         selectedItemColor: const Color(0xff316342),
         unselectedItemColor: const Color(0xff8a8a80),
         items: [
-          const BottomNavigationBarItem(icon: Icon(Icons.dashboard_outlined), activeIcon: Icon(Icons.dashboard), label: 'Dashboard'),
-          const BottomNavigationBarItem(icon: Icon(Icons.description_outlined), activeIcon: Icon(Icons.description), label: 'Docs'),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.badge_outlined), 
-            activeIcon: const Icon(Icons.badge), 
-            label: isIndividual ? 'Family' : 'Employees',
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.dashboard_outlined),
+            activeIcon: Icon(Icons.dashboard),
+            label: 'Dashboard',
           ),
-          const BottomNavigationBarItem(icon: Icon(Icons.help_outline), activeIcon: Icon(Icons.help), label: 'Support'),
-          const BottomNavigationBarItem(icon: Icon(Icons.account_circle_outlined), activeIcon: Icon(Icons.account_circle), label: 'Profile'),
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.description_outlined),
+            activeIcon: const Icon(Icons.description),
+            label: isIndividual ? 'My Docs' : 'Company',
+          ),
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.badge_outlined),
+            activeIcon: const Icon(Icons.badge),
+            label: isIndividual ? 'Family' : 'Employee',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.help_outline),
+            activeIcon: Icon(Icons.help),
+            label: 'Support',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.account_circle_outlined),
+            activeIcon: Icon(Icons.account_circle),
+            label: 'Profile',
+          ),
         ],
       ),
     );

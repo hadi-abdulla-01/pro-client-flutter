@@ -28,6 +28,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   int _expiredCount = 0;
   String _whatsappNumber = '+971 50 000 0000';
   String _contactNumber = '+971 4 000 0000';
+  String _adminCompanyName = 'PRO Services';
+  String _adminCompanyLogoUrl = '';
   late AnimationController _animController;
   late Animation<double> _ringAnim;
 
@@ -183,6 +185,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           _whatsappNumber = setting['value'];
         } else if (setting['key'] == 'support_phone') {
           _contactNumber = setting['value'];
+        } else if (setting['key'] == 'admin_company_name') {
+          _adminCompanyName = setting['value'];
+        } else if (setting['key'] == 'admin_company_logo_url') {
+          _adminCompanyLogoUrl = setting['value'];
         }
       }
     } catch (e) {
@@ -357,15 +363,95 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // ── Welcome Hero ─────────────────────────────────
-                  Text('PREMIUM PORTAL',
-                      style: GoogleFonts.nunitoSans(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 2,
-                        color: TerraTheme.neutral500,
-                      )),
-                  const SizedBox(height: 4),
+                  // ── Admin PRO Branding Banner ─────────────────────
+                  if (_adminCompanyName.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 20),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xff1a2410), Color(0xff3D4A2A)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(18),
+                        boxShadow: const [
+                          BoxShadow(color: Color(0x303D4A2A), blurRadius: 16, offset: Offset(0, 6)),
+                        ],
+                      ),
+                      child: Stack(
+                        children: [
+                          // Subtle shimmer pattern
+                          Positioned.fill(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(18),
+                              child: CustomPaint(painter: _DotPatternPainter()),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                            child: Row(
+                              children: [
+                                if (_adminCompanyLogoUrl.isNotEmpty) ...[
+                                  Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Colors.white.withOpacity(0.12),
+                                      border: Border.all(color: TerraTheme.gold500.withOpacity(0.5), width: 1.5),
+                                    ),
+                                    child: ClipOval(
+                                      child: Image.network(
+                                        _adminCompanyLogoUrl,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => const Icon(Icons.business, color: TerraTheme.gold500, size: 22),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 14),
+                                ] else ...[
+                                  Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: TerraTheme.gold500.withOpacity(0.15),
+                                      border: Border.all(color: TerraTheme.gold500.withOpacity(0.4), width: 1.5),
+                                    ),
+                                    child: const Icon(Icons.verified_rounded, color: TerraTheme.gold500, size: 22),
+                                  ),
+                                  const SizedBox(width: 14),
+                                ],
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('POWERED BY',
+                                          style: GoogleFonts.nunitoSans(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: 1.5,
+                                            color: TerraTheme.gold500.withOpacity(0.8),
+                                          )),
+                                      const SizedBox(height: 2),
+                                      Text(_adminCompanyName,
+                                          style: GoogleFonts.nunitoSans(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w800,
+                                            color: Colors.white,
+                                            height: 1.2,
+                                          )),
+                                    ],
+                                  ),
+                                ),
+                                const Icon(Icons.shield_outlined, color: TerraTheme.gold500, size: 20),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
                   Text('Welcome back,',
                       style: GoogleFonts.nunitoSans(
                         fontSize: 30,

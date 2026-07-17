@@ -101,9 +101,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Company Card Overview
-            if (_company?['entity_type'] != 'individual') ...[
-              Card(
+            // Entity Card Overview
+            Card(
               child: Padding(
                 padding: const EdgeInsets.all(20.0),
                 child: Column(
@@ -111,42 +110,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     CircleAvatar(
                       radius: 32,
                       backgroundColor: const Color(0xffe8ecde),
-                      child: Text(
-                        (_company?['name'] ?? 'C')[0].toUpperCase(),
-                        style: const TextStyle(
-                          color: Color(0xff316342),
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      backgroundImage: (_company?['entity_type'] == 'individual' && _userProfile?['photo_url'] != null && _userProfile!['photo_url'].toString().isNotEmpty)
+                          ? NetworkImage(_userProfile!['photo_url'])
+                          : (_company?['logo_url'] != null && _company!['logo_url'].toString().isNotEmpty)
+                              ? NetworkImage(_company!['logo_url'])
+                              : null,
+                      child: ((_company?['entity_type'] == 'individual' && (_userProfile?['photo_url'] == null || _userProfile!['photo_url'].toString().isEmpty)) || 
+                              (_company?['entity_type'] != 'individual' && (_company?['logo_url'] == null || _company!['logo_url'].toString().isEmpty)))
+                          ? Text(
+                              (_company?['entity_type'] == 'individual' ? (_userProfile?['name'] ?? 'U')[0] : (_company?['name'] ?? 'C')[0]).toUpperCase(),
+                              style: const TextStyle(
+                                color: Color(0xff316342),
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            )
+                          : null,
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      _company?['name'] ?? 'Company Name',
+                      _company?['entity_type'] == 'individual' ? (_userProfile?['name'] ?? 'Family Name') : (_company?['name'] ?? 'Company Name'),
                       style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: const Color(0xff316342).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        (_company?['subscription_plan'] ?? 'Standard').toString().toUpperCase(),
-                        style: const TextStyle(
-                          color: Color(0xff316342),
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
+                    if (_company?['entity_type'] != 'individual')
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xff316342).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          (_company?['subscription_plan'] ?? 'Standard').toString().toUpperCase(),
+                          style: const TextStyle(
+                            color: Color(0xff316342),
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),
-              ),
-            ],
+            ),
             const SizedBox(height: 20),
 
             // Account details section

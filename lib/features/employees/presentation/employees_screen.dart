@@ -67,36 +67,6 @@ class _EmployeesScreenState extends ConsumerState<EmployeesScreen> {
     }
   }
 
-  // Returns visa/expiry status: 'OK', expired days, or days remaining
-  String _docDaysLabel(String? expiryStr) {
-    if (expiryStr == null) return 'OK';
-    final expiry = DateTime.tryParse(expiryStr);
-    if (expiry == null) return 'OK';
-    final diff = expiry.difference(DateTime.now()).inDays;
-    if (diff < 0) return 'EXP';
-    if (diff <= 30) return '${diff}d';
-    return 'OK';
-  }
-
-  Color _docPillColor(String label) {
-    if (label == 'EXP') return TerraTheme.error;
-    if (label.endsWith('d')) return TerraTheme.warning;
-    return TerraTheme.olive900;
-  }
-
-  Color _dotStatusColor(Map<String, dynamic> emp) {
-    final visa = emp['visa_expiry'];
-    final eid = emp['eid_expiry'];
-    final passport = emp['passport_expiry'];
-    for (final d in [visa, eid, passport]) {
-      if (d == null) continue;
-      final expiry = DateTime.tryParse(d);
-      if (expiry == null) continue;
-      if (expiry.isBefore(DateTime.now())) return TerraTheme.error;
-      if (expiry.isBefore(DateTime.now().add(const Duration(days: 30)))) return TerraTheme.warning;
-    }
-    return TerraTheme.success;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -286,18 +256,13 @@ class _EmployeesScreenState extends ConsumerState<EmployeesScreen> {
                         final firstName = emp['first_name'] ?? '';
                         final lastName = emp['last_name'] ?? '';
                         final initials = '${firstName.isNotEmpty ? firstName[0] : ''}${lastName.isNotEmpty ? lastName[0] : ''}'.toUpperCase();
-                        final dotColor = _dotStatusColor(emp);
-
-                        final visaLabel = _docDaysLabel(emp['visa_expiry']);
-                        final eidLabel = _docDaysLabel(emp['eid_expiry']);
-                        final passportLabel = _docDaysLabel(emp['passport_expiry']);
 
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 12),
                           child: GestureDetector(
                             onTap: () => context.go('/employees/${emp['id']}'),
                             child: Container(
-                              padding: const EdgeInsets.all(16),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(18),
@@ -308,41 +273,34 @@ class _EmployeesScreenState extends ConsumerState<EmployeesScreen> {
                               ),
                               child: Row(
                                 children: [
-                                  // Avatar with status dot
-                                  Stack(
-                                    children: [
-                                      Container(
-                                        width: 56, height: 56,
-                                        decoration: BoxDecoration(
-                                          color: TerraTheme.olive100,
-                                          shape: BoxShape.circle,
-                                          border: Border.all(color: Colors.white, width: 2),
-                                          boxShadow: const [BoxShadow(color: Color(0x1A000000), blurRadius: 4)],
-                                        ),
-                                        child: Center(
-                                          child: Text(initials,
-                                              style: GoogleFonts.nunitoSans(
-                                                color: TerraTheme.primary,
-                                                fontWeight: FontWeight.w800,
-                                                fontSize: 16,
-                                              )),
-                                        ),
-                                      ),
-                                      Positioned(
-                                        bottom: 0, right: 0,
-                                        child: Container(
-                                          width: 16, height: 16,
-                                          decoration: BoxDecoration(
-                                            color: dotColor,
-                                            shape: BoxShape.circle,
-                                            border: Border.all(color: Colors.white, width: 2),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
+                                  // Avatar
+                                  Container(
+                                    width: 50, height: 50,
+                                    decoration: BoxDecoration(
+                                      color: TerraTheme.olive100,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.white, width: 2),
+                                      boxShadow: const [BoxShadow(color: Color(0x1A000000), blurRadius: 4)],
+                                      image: (emp['photo_url'] != null && emp['photo_url'].toString().isNotEmpty)
+                                          ? DecorationImage(
+                                              image: NetworkImage(emp['photo_url']),
+                                              fit: BoxFit.cover,
+                                            )
+                                          : null,
+                                    ),
+                                    child: (emp['photo_url'] == null || emp['photo_url'].toString().isEmpty)
+                                        ? Center(
+                                            child: Text(initials,
+                                                style: GoogleFonts.nunitoSans(
+                                                  color: TerraTheme.primary,
+                                                  fontWeight: FontWeight.w800,
+                                                  fontSize: 16,
+                                                )),
+                                          )
+                                        : null,
                                   ),
                                   const SizedBox(width: 14),
-                                  // Name, role, doc pills
+                                  // Name & role
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -353,22 +311,12 @@ class _EmployeesScreenState extends ConsumerState<EmployeesScreen> {
                                               fontWeight: FontWeight.w700,
                                               color: TerraTheme.olive900,
                                             )),
-                                        const SizedBox(height: 2),
+                                        const SizedBox(height: 3),
                                         Text(emp['designation'] ?? (isIndividual ? 'Family Member' : 'Employee'),
                                             style: GoogleFonts.nunitoSans(
                                               fontSize: 13,
                                               color: TerraTheme.neutral500,
                                             )),
-                                        const SizedBox(height: 8),
-                                        Row(
-                                          children: [
-                                            _DocPill(label: 'Visa: $visaLabel', color: _docPillColor(visaLabel)),
-                                            const SizedBox(width: 6),
-                                            _DocPill(label: 'EID: $eidLabel', color: _docPillColor(eidLabel)),
-                                            const SizedBox(width: 6),
-                                            _DocPill(label: 'PP: $passportLabel', color: _docPillColor(passportLabel)),
-                                          ],
-                                        ),
                                       ],
                                     ),
                                   ),
@@ -440,28 +388,3 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
-class _DocPill extends StatelessWidget {
-  final String label;
-  final Color color;
-
-  const _DocPill({required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    final isAlert = color != TerraTheme.olive900;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(
-        color: isAlert ? color.withOpacity(0.1) : TerraTheme.olive100,
-        borderRadius: BorderRadius.circular(50),
-      ),
-      child: Text(label,
-          style: GoogleFonts.nunitoSans(
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-            color: isAlert ? color : TerraTheme.olive900,
-            letterSpacing: 0.3,
-          )),
-    );
-  }
-}
