@@ -273,19 +273,12 @@ class _AppShellState extends ConsumerState<AppShell> {
         _isNavigatingToReset = true;
         Future.delayed(Duration.zero, () {
           if (mounted) {
-            // Check if user is logged in
-            final session = supabase.auth.currentSession;
-            if (session != null) {
-              // User is logged in, navigate to reset password
-              setState(() {
-                _currentIndex = 4; // Profile tab
-              });
-              context.go('/reset-password');
-            } else {
-              // User is not logged in, navigate to login first
-              // The reset token will be handled by Supabase after login
-              context.go('/login');
-            }
+            // Always navigate to reset password screen
+            // The screen will handle the token from the URL
+            setState(() {
+              _currentIndex = 4; // Profile tab
+            });
+            context.go('/reset-password');
             _isNavigatingToReset = false;
           }
         });
