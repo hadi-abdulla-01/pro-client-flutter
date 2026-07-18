@@ -1,16 +1,15 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:dio/dio.dart';
-import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../core/company_selector_chip.dart';
 import '../../../core/selected_company_provider.dart';
 import '../../../core/supabase_client.dart';
 import '../../../core/theme.dart';
+import '../../../core/utils/file_utils.dart';
 import '../../../core/router.dart';
 import 'document_viewer_screen.dart';
 
@@ -189,108 +188,15 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
       final String signedUrl = await supabase.storage
           .from(doc['bucket'])
           .createSignedUrl(doc['path'], 300);
+      final extension = await FileUtils.getFileExtension(
+        doc['name'] as String? ?? 'file',
+      );
 
-      Directory? saveDir;
-      if (Platform.isAndroid) {
-        saveDir = Directory('/storage/emulated/0/Download/ProApp');
-      } else {
-        saveDir = await getApplicationDocumentsDirectory();
-      }
+      final Directory saveDir = Platform.isAndroid
+          ? Directory('/storage/emulated/0/Download/ProApp')
+          : await getApplicationDocumentsDirectory();
 
-      if (!await saveDir.exists()) {
-        await saveDir.create(recursive: true);
-      }
-
-      String extension = '';
-      final pathStr = (doc['path'] ?? '').toString();
-      if (pathStr.contains('.')) {
-        final ext = pathStr.split('.').last.toLowerCase();
-        if ([
-          'pdf',
-          'jpg',
-          'jpeg',
-          'png',
-          'gif',
-          'webp',
-          'doc',
-          'docx',
-        ].contains(ext)) {
-          extension = ext;
-        }
-      }
-      if (extension.isEmpty) {
-        final nameStr = (doc['name'] ?? '').toString().toLowerCase();
-        if (nameStr.endsWith('.pdf')) {
-          extension = 'pdf';
-        } else if (nameStr.endsWith('.png')) {
-          extension = 'png';
-        } else if (nameStr.endsWith('.jpeg') || nameStr.endsWith('.jpg')) {
-          extension = 'jpg';
-        }
-      }
-      if (extension.isEmpty) {
-        try {
-          final response = await Dio().get<ResponseBody>(
-            signedUrl,
-            options: Options(
-              responseType: ResponseType.stream,
-              headers: {'Range': 'bytes=0-15'},
-              followRedirects: true,
-              validateStatus: (status) => status != null && status < 500,
-            ),
-          );
-
-          final contentType =
-              response.headers.value('content-type')?.toLowerCase() ?? '';
-          final bytesList = await response.data!.stream.first;
-          final bytes = List<int>.from(bytesList);
-
-          if (bytes.length >= 4) {
-            if (bytes[0] == 0x25 &&
-                bytes[1] == 0x50 &&
-                bytes[2] == 0x44 &&
-                bytes[3] == 0x46) {
-              extension = 'pdf';
-            } else if (bytes[0] == 0x89 &&
-                bytes[1] == 0x50 &&
-                bytes[2] == 0x4E &&
-                bytes[3] == 0x47) {
-              extension = 'png';
-            } else if (bytes[0] == 0xFF &&
-                bytes[1] == 0xD8 &&
-                bytes[2] == 0xFF) {
-              extension = 'jpg';
-            } else if (bytes[0] == 0x47 &&
-                bytes[1] == 0x49 &&
-                bytes[2] == 0x46 &&
-                bytes[3] == 0x38) {
-              extension = 'gif';
-            }
-          }
-
-          if (extension.isEmpty) {
-            if (contentType.contains('pdf')) {
-              extension = 'pdf';
-            } else if (contentType.contains('image/png')) {
-              extension = 'png';
-            } else if (contentType.contains('image/jpeg') ||
-                contentType.contains('image/jpg')) {
-              extension = 'jpg';
-            } else if (contentType.contains('image/gif')) {
-              extension = 'gif';
-            } else if (contentType.contains('image/webp')) {
-              extension = 'webp';
-            }
-          }
-        } catch (e) {
-          debugPrint(
-            'Range GET request failed to determine file type for download: $e',
-          );
-        }
-      }
-      if (extension.isEmpty) {
-        extension = 'jpg';
-      }
+      await saveDir.create(recursive: true);
 
       final String fileName =
           "${doc['name'] ?? 'doc'}_${DateTime.now().millisecondsSinceEpoch}.$extension";
@@ -334,94 +240,9 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
       final String signedUrl = await supabase.storage
           .from(doc['bucket'])
           .createSignedUrl(doc['path'], 300);
-
-      // Resolve extension from the stored path
-      String extension = '';
-      final pathStr = (doc['path'] ?? '').toString();
-      if (pathStr.contains('.')) {
-        final ext = pathStr.split('.').last.toLowerCase();
-        if ([
-          'pdf',
-          'jpg',
-          'jpeg',
-          'png',
-          'gif',
-          'webp',
-          'doc',
-          'docx',
-        ].contains(ext)) {
-          extension = ext;
-        }
-      }
-      // Fallback: check file name
-      if (extension.isEmpty) {
-        final nameStr = (doc['name'] ?? '').toString().toLowerCase();
-        for (final ext in [
-          'pdf',
-          'png',
-          'jpg',
-          'jpeg',
-          'gif',
-          'webp',
-          'doc',
-          'docx',
-        ]) {
-          if (nameStr.endsWith('.$ext')) {
-            extension = ext;
-            break;
-          }
-        }
-      }
-      // Fallback: sniff magic bytes
-      if (extension.isEmpty) {
-        try {
-          final response = await Dio().get<ResponseBody>(
-            signedUrl,
-            options: Options(
-              responseType: ResponseType.stream,
-              headers: {'Range': 'bytes=0-15'},
-              followRedirects: true,
-              validateStatus: (s) => s != null && s < 500,
-            ),
-          );
-          final contentType =
-              response.headers.value('content-type')?.toLowerCase() ?? '';
-          final bytes = List<int>.from(await response.data!.stream.first);
-          if (bytes.length >= 4) {
-            if (bytes[0] == 0x25 &&
-                bytes[1] == 0x50 &&
-                bytes[2] == 0x44 &&
-                bytes[3] == 0x46)
-              extension = 'pdf';
-            else if (bytes[0] == 0x89 &&
-                bytes[1] == 0x50 &&
-                bytes[2] == 0x4E &&
-                bytes[3] == 0x47)
-              extension = 'png';
-            else if (bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF)
-              extension = 'jpg';
-            else if (bytes[0] == 0x47 &&
-                bytes[1] == 0x49 &&
-                bytes[2] == 0x46 &&
-                bytes[3] == 0x38)
-              extension = 'gif';
-          }
-          if (extension.isEmpty) {
-            if (contentType.contains('pdf'))
-              extension = 'pdf';
-            else if (contentType.contains('image/png'))
-              extension = 'png';
-            else if (contentType.contains('image/jpeg') ||
-                contentType.contains('image/jpg'))
-              extension = 'jpg';
-            else if (contentType.contains('image/gif'))
-              extension = 'gif';
-            else if (contentType.contains('image/webp'))
-              extension = 'webp';
-          }
-        } catch (_) {}
-      }
-      if (extension.isEmpty) extension = 'pdf';
+      final extension = await FileUtils.getFileExtension(
+        doc['name'] as String? ?? 'file',
+      );
 
       // Download to a temp file preserving format
       final tempDir = await getTemporaryDirectory();
@@ -430,19 +251,7 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
       final savePath = '${tempDir.path}/$fileName';
       await Dio().download(signedUrl, savePath);
 
-      // MIME type for share sheet
-      final mimeMap = {
-        'pdf': 'application/pdf',
-        'png': 'image/png',
-        'jpg': 'image/jpeg',
-        'jpeg': 'image/jpeg',
-        'gif': 'image/gif',
-        'webp': 'image/webp',
-        'doc': 'application/msword',
-        'docx':
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      };
-      final mimeType = mimeMap[extension] ?? 'application/octet-stream';
+      final mimeType = FileUtils.getMimeType(extension);
 
       await Share.shareXFiles([
         XFile(savePath, mimeType: mimeType),
