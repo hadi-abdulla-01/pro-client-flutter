@@ -19,9 +19,28 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   bool _isLoading = false;
   String? _errorMessage;
   String? _successMessage;
+  DateTime? _lastRequestTime;
+  static const _cooldownDuration = Duration(minutes: 5);
 
   Future<void> _handleResetPassword() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // Check cooldown
+    if (_lastRequestTime != null) {
+      final timeSinceLastRequest = DateTime.now().difference(_lastRequestTime!);
+      if (timeSinceLastRequest < _cooldownDuration) {
+        final remainingSeconds =
+            _cooldownDuration.inSeconds - timeSinceLastRequest.inSeconds;
+        final minutes = (remainingSeconds / 60).floor();
+        final seconds = remainingSeconds % 60;
+        setState(() {
+          _errorMessage =
+              'Please wait $minutes min $seconds sec before requesting again.';
+        });
+        return;
+      }
+    }
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -34,16 +53,26 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
         redirectTo: 'proapp://reset-password',
       );
 
+      _lastRequestTime = DateTime.now();
       setState(() {
         _successMessage =
             'Password reset link sent to your email. Please check your inbox.';
       });
     } catch (e) {
-      setState(() {
-        _errorMessage = e
+      final errorStr = e.toString().toLowerCase();
+      String errorMessage;
+      if (errorStr.contains('rate limit') ||
+          errorStr.contains('too many requests')) {
+        errorMessage =
+            'Too many reset attempts. Please wait 1 hour before trying again, or contact support if you need immediate help.';
+      } else {
+        errorMessage = e
             .toString()
             .replaceAll('Exception: ', '')
             .replaceAll('AuthException: ', '');
+      }
+      setState(() {
+        _errorMessage = errorMessage;
       });
     } finally {
       if (mounted) setState(() => _isLoading = false);
