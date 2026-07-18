@@ -53,6 +53,7 @@ dependencies:
   firebase_messaging: ^16.4.3
   shared_preferences: ^2.5.5
   app_links: ^6.4.1
+  path: ^1.9.1
 
 
 dev_dependencies:
