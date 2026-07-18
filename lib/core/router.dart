@@ -18,6 +18,7 @@ import 'selected_company_provider.dart';
 import 'notification_service.dart';
 import 'local_storage_service.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:app_links/app_links.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -173,6 +174,8 @@ class AppShell extends ConsumerStatefulWidget {
 
 class _AppShellState extends ConsumerState<AppShell> {
   int _currentIndex = 0;
+  final _appLinks = AppLinks();
+  bool _isNavigatingToReset = false;
 
   @override
   void initState() {
@@ -183,6 +186,8 @@ class _AppShellState extends ConsumerState<AppShell> {
       _fetchUnreadCount();
       _setupPushNotifications();
       _listenForForegroundNotifications();
+      _handleInitialLink();
+      _listenToLinks();
     });
   }
 
@@ -232,6 +237,59 @@ class _AppShellState extends ConsumerState<AppShell> {
       debugPrint('FCM Token saved: $fcmToken');
     } catch (e) {
       debugPrint('Error saving FCM token: $e');
+    }
+  }
+
+  Future<void> _handleInitialLink() async {
+    try {
+      final initialUri = await _appLinks.getInitialLink();
+      if (initialUri != null) {
+        debugPrint('App opened from initial link: $initialUri');
+        _handleResetPasswordLink(initialUri);
+      }
+    } catch (e) {
+      debugPrint('Error getting initial link: $e');
+    }
+  }
+
+  void _listenToLinks() {
+    _appLinks.uriLinkStream.listen(
+      (uri) {
+        debugPrint('App opened from link: $uri');
+        _handleResetPasswordLink(uri);
+      },
+      onError: (e) {
+        debugPrint('Error listening to links: $e');
+      },
+    );
+  }
+
+  void _handleResetPasswordLink(Uri uri) {
+    // Check if this is a password reset link
+    if (uri.host == 'reset-password' || uri.path == '/reset-password') {
+      debugPrint('Navigating to reset password screen');
+      // Navigate to reset password screen
+      if (!_isNavigatingToReset) {
+        _isNavigatingToReset = true;
+        Future.delayed(Duration.zero, () {
+          if (mounted) {
+            // Check if user is logged in
+            final session = supabase.auth.currentSession;
+            if (session != null) {
+              // User is logged in, navigate to reset password
+              setState(() {
+                _currentIndex = 4; // Profile tab
+              });
+              context.go('/reset-password');
+            } else {
+              // User is not logged in, navigate to login first
+              // The reset token will be handled by Supabase after login
+              context.go('/login');
+            }
+            _isNavigatingToReset = false;
+          }
+        });
+      }
     }
   }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/supabase_client.dart';
 import '../../../core/theme.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -101,6 +102,162 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (mounted) {
       context.go('/login');
     }
+  }
+
+  void _showChangePasswordDialog() {
+    final currentPasswordController = TextEditingController();
+    final newPasswordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+    bool isObscureCurrent = true;
+    bool isObscureNew = true;
+    bool isObscureConfirm = true;
+    bool isLoading = false;
+    String? errorMessage;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (BuildContext context, StateSetter setState) => AlertDialog(
+          title: const Text('Change Password'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (errorMessage != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: TerraTheme.error.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      errorMessage!,
+                      style: const TextStyle(
+                        color: TerraTheme.error,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                TextField(
+                  controller: currentPasswordController,
+                  obscureText: isObscureCurrent,
+                  decoration: InputDecoration(
+                    labelText: 'Current Password',
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        isObscureCurrent
+                            ? Icons.visibility_off
+                            : Icons.visibility,
+                      ),
+                      onPressed: () =>
+                          setState(() => isObscureCurrent = !isObscureCurrent),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: newPasswordController,
+                  obscureText: isObscureNew,
+                  decoration: InputDecoration(
+                    labelText: 'New Password',
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        isObscureNew ? Icons.visibility_off : Icons.visibility,
+                      ),
+                      onPressed: () =>
+                          setState(() => isObscureNew = !isObscureNew),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: confirmPasswordController,
+                  obscureText: isObscureConfirm,
+                  decoration: InputDecoration(
+                    labelText: 'Confirm New Password',
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        isObscureConfirm
+                            ? Icons.visibility_off
+                            : Icons.visibility,
+                      ),
+                      onPressed: () =>
+                          setState(() => isObscureConfirm = !isObscureConfirm),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isLoading ? null : () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      if (newPasswordController.text !=
+                          confirmPasswordController.text) {
+                        setState(() => errorMessage = 'Passwords do not match');
+                        return;
+                      }
+                      if (newPasswordController.text.length < 8) {
+                        setState(
+                          () => errorMessage =
+                              'Password must be at least 8 characters',
+                        );
+                        return;
+                      }
+                      setState(() {
+                        isLoading = true;
+                        errorMessage = null;
+                      });
+                      try {
+                        await supabase.auth.updateUser(
+                          UserAttributes(password: newPasswordController.text),
+                        );
+                        if (dialogContext.mounted) {
+                          Navigator.pop(dialogContext);
+                        }
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Password updated successfully'),
+                              backgroundColor: Color(0xff316342),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        setState(() {
+                          errorMessage = e
+                              .toString()
+                              .replaceAll('Exception: ', '')
+                              .replaceAll('AuthException: ', '');
+                        });
+                      } finally {
+                        setState(() => isLoading = false);
+                      }
+                    },
+              child: isLoading
+                  ? const SizedBox(
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation(Colors.white),
+                      ),
+                    )
+                  : const Text('Update Password'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -465,34 +622,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 backgroundColor: TerraTheme.primary,
                 foregroundColor: Colors.white,
               ),
-              onPressed: () async {
-                final email = _userProfile?['email'];
-                if (email == null || email.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Email not found')),
-                  );
-                  return;
-                }
-                try {
-                  await supabase.auth.resetPasswordForEmail(email);
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Password reset link sent to your email'),
-                        backgroundColor: Color(0xff316342),
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error: ${e.toString()}'),
-                        backgroundColor: TerraTheme.error,
-                      ),
-                    );
-                  }
-                }
+              onPressed: () {
+                _showChangePasswordDialog();
               },
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,

@@ -50,8 +50,14 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     try {
       await supabase.auth.resetPasswordForEmail(
         _emailController.text.trim(),
-        redirectTo: 'proapp://reset-password',
+        redirectTo: 'https://proappadmin.netlify.app/reset-password',
       );
+
+      _lastRequestTime = DateTime.now();
+      setState(() {
+        _successMessage =
+            'Password reset link sent to your email. Please check your inbox and spam folder.';
+      });
 
       _lastRequestTime = DateTime.now();
       setState(() {

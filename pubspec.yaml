@@ -52,6 +52,7 @@ dependencies:
   firebase_core: ^4.12.1
   firebase_messaging: ^16.4.3
   shared_preferences: ^2.5.5
+  app_links: ^6.4.1
 
 
 dev_dependencies:
