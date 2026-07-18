@@ -119,73 +119,240 @@ class _ProfileScreenState extends State<ProfileScreen> {
       barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(
         builder: (BuildContext context, StateSetter setState) => AlertDialog(
-          title: const Text('Change Password'),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: const BoxDecoration(
+                  color: Color(0xff316342),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.lock_reset_rounded,
+                  color: Colors.white,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Change Password',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xff2b2b26),
+                ),
+              ),
+            ],
+          ),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (errorMessage != null) ...[
                   Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: TerraTheme.error.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
                     ),
-                    child: Text(
-                      errorMessage!,
-                      style: const TextStyle(
-                        color: TerraTheme.error,
-                        fontSize: 12,
+                    decoration: BoxDecoration(
+                      color: TerraTheme.error.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: TerraTheme.error.withOpacity(0.3),
                       ),
                     ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.error_outline,
+                          color: TerraTheme.error,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            errorMessage!,
+                            style: GoogleFonts.nunitoSans(
+                              color: TerraTheme.error,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
                 ],
                 TextField(
                   controller: currentPasswordController,
                   obscureText: isObscureCurrent,
+                  style: GoogleFonts.nunitoSans(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xff2b2b26),
+                  ),
                   decoration: InputDecoration(
                     labelText: 'Current Password',
+                    labelStyle: GoogleFonts.nunitoSans(
+                      fontSize: 13,
+                      color: const Color(0xff8a8a80),
+                    ),
+                    prefixIcon: const Icon(
+                      Icons.lock_outline,
+                      size: 18,
+                      color: Color(0xff8a8a80),
+                    ),
                     suffixIcon: IconButton(
                       icon: Icon(
                         isObscureCurrent
-                            ? Icons.visibility_off
-                            : Icons.visibility,
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        size: 18,
+                        color: const Color(0xff8a8a80),
                       ),
                       onPressed: () =>
                           setState(() => isObscureCurrent = !isObscureCurrent),
                     ),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                    filled: true,
+                    fillColor: TerraTheme.cream50,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xffe8ecde)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xffe8ecde)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Color(0xff316342),
+                        width: 1.5,
+                      ),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 TextField(
                   controller: newPasswordController,
                   obscureText: isObscureNew,
+                  style: GoogleFonts.nunitoSans(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xff2b2b26),
+                  ),
                   decoration: InputDecoration(
                     labelText: 'New Password',
+                    labelStyle: GoogleFonts.nunitoSans(
+                      fontSize: 13,
+                      color: const Color(0xff8a8a80),
+                    ),
+                    prefixIcon: const Icon(
+                      Icons.lock_outline,
+                      size: 18,
+                      color: Color(0xff8a8a80),
+                    ),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        isObscureNew ? Icons.visibility_off : Icons.visibility,
+                        isObscureNew
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        size: 18,
+                        color: const Color(0xff8a8a80),
                       ),
                       onPressed: () =>
                           setState(() => isObscureNew = !isObscureNew),
                     ),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                    filled: true,
+                    fillColor: TerraTheme.cream50,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xffe8ecde)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xffe8ecde)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Color(0xff316342),
+                        width: 1.5,
+                      ),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 TextField(
                   controller: confirmPasswordController,
                   obscureText: isObscureConfirm,
+                  style: GoogleFonts.nunitoSans(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xff2b2b26),
+                  ),
                   decoration: InputDecoration(
                     labelText: 'Confirm New Password',
+                    labelStyle: GoogleFonts.nunitoSans(
+                      fontSize: 13,
+                      color: const Color(0xff8a8a80),
+                    ),
+                    prefixIcon: const Icon(
+                      Icons.lock_outline,
+                      size: 18,
+                      color: Color(0xff8a8a80),
+                    ),
                     suffixIcon: IconButton(
                       icon: Icon(
                         isObscureConfirm
-                            ? Icons.visibility_off
-                            : Icons.visibility,
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        size: 18,
+                        color: const Color(0xff8a8a80),
                       ),
                       onPressed: () =>
                           setState(() => isObscureConfirm = !isObscureConfirm),
+                    ),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                    filled: true,
+                    fillColor: TerraTheme.cream50,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xffe8ecde)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xffe8ecde)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Color(0xff316342),
+                        width: 1.5,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: Text(
+                    'Must be 8+ characters with uppercase, lowercase, number, and special character',
+                    style: GoogleFonts.nunitoSans(
+                      fontSize: 11,
+                      color: const Color(0xff8a8a80),
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
@@ -195,7 +362,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           actions: [
             TextButton(
               onPressed: isLoading ? null : () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xff8a8a80),
+              ),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.nunitoSans(fontWeight: FontWeight.w700),
+              ),
             ),
             ElevatedButton(
               onPressed: isLoading
@@ -226,9 +399,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         }
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Password updated successfully'),
-                              backgroundColor: Color(0xff316342),
+                            SnackBar(
+                              content: Text(
+                                'Password updated successfully',
+                                style: GoogleFonts.nunitoSans(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              backgroundColor: const Color(0xff316342),
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
                             ),
                           );
                         }
@@ -243,16 +425,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         setState(() => isLoading = false);
                       }
                     },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xff316342),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
               child: isLoading
                   ? const SizedBox(
-                      height: 16,
-                      width: 16,
+                      height: 20,
+                      width: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
                         valueColor: AlwaysStoppedAnimation(Colors.white),
                       ),
                     )
-                  : const Text('Update Password'),
+                  : Text(
+                      'Update Password',
+                      style: GoogleFonts.nunitoSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
             ),
           ],
         ),
