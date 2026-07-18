@@ -374,18 +374,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onPressed: isLoading
                   ? null
                   : () async {
+                      // Validate passwords match
                       if (newPasswordController.text !=
                           confirmPasswordController.text) {
                         setState(() => errorMessage = 'Passwords do not match');
                         return;
                       }
-                      if (newPasswordController.text.length < 8) {
+
+                      // Validate password requirements
+                      final newPwd = newPasswordController.text;
+                      if (newPwd.length < 8) {
                         setState(
                           () => errorMessage =
                               'Password must be at least 8 characters',
                         );
                         return;
                       }
+                      if (!RegExp(r'[A-Z]').hasMatch(newPwd)) {
+                        setState(
+                          () => errorMessage =
+                              'Password must contain at least one uppercase letter',
+                        );
+                        return;
+                      }
+                      if (!RegExp(r'[a-z]').hasMatch(newPwd)) {
+                        setState(
+                          () => errorMessage =
+                              'Password must contain at least one lowercase letter',
+                        );
+                        return;
+                      }
+                      if (!RegExp(r'[0-9]').hasMatch(newPwd)) {
+                        setState(
+                          () => errorMessage =
+                              'Password must contain at least one number',
+                        );
+                        return;
+                      }
+                      if (!RegExp(r'[^A-Za-z0-9]').hasMatch(newPwd)) {
+                        setState(
+                          () => errorMessage =
+                              'Password must contain at least one special character',
+                        );
+                        return;
+                      }
+
                       setState(() {
                         isLoading = true;
                         errorMessage = null;
