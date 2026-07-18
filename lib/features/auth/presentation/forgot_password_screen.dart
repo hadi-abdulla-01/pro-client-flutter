@@ -20,7 +20,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   String? _errorMessage;
   String? _successMessage;
   DateTime? _lastRequestTime;
-  static const _cooldownDuration = Duration(minutes: 5);
+  static const _cooldownDuration = Duration(minutes: 1);
 
   Future<void> _handleResetPassword() async {
     if (!_formKey.currentState!.validate()) return;
@@ -64,7 +64,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       if (errorStr.contains('rate limit') ||
           errorStr.contains('too many requests')) {
         errorMessage =
-            'Too many reset attempts. Please wait 1 hour before trying again, or contact support if you need immediate help.';
+            'Too many reset attempts. Please wait a few minutes and try again.';
       } else {
         errorMessage = e
             .toString()
