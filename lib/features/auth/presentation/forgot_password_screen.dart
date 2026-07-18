@@ -28,11 +28,13 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     // Check cooldown
     if (_lastRequestTime != null) {
       final timeSinceLastRequest = DateTime.now().difference(_lastRequestTime!);
+
       if (timeSinceLastRequest < _cooldownDuration) {
         final remainingSeconds =
             _cooldownDuration.inSeconds - timeSinceLastRequest.inSeconds;
         final minutes = (remainingSeconds / 60).floor();
         final seconds = remainingSeconds % 60;
+
         setState(() {
           _errorMessage =
               'Please wait $minutes min $seconds sec before requesting again.';
@@ -48,24 +50,29 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     });
 
     try {
+      // Supabase Flutter uses PKCE flow by default. With PKCE, Supabase
+      // appends the token_hash directly to this URL as a query parameter.
+      // The /reset-password page reads token_hash and calls verifyOtp()
+      // client-side to establish the session before showing the form.
+      const redirectUrl =
+          'https://proappadmin.netlify.app/reset-password';
+
+      debugPrint('Redirect URL: $redirectUrl');
+
       await supabase.auth.resetPasswordForEmail(
         _emailController.text.trim(),
-        redirectTo: 'https://proappadmin.netlify.app/reset-password',
+        redirectTo: redirectUrl,
       );
 
       _lastRequestTime = DateTime.now();
+
       setState(() {
         _successMessage =
             'Password reset link sent to your email. Please check your inbox and spam folder.';
       });
-
-      _lastRequestTime = DateTime.now();
-      setState(() {
-        _successMessage =
-            'Password reset link sent to your email. Please check your inbox.';
-      });
     } catch (e) {
       final errorStr = e.toString().toLowerCase();
+
       String errorMessage;
       if (errorStr.contains('rate limit') ||
           errorStr.contains('too many requests')) {
@@ -77,11 +84,14 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
             .replaceAll('Exception: ', '')
             .replaceAll('AuthException: ', '');
       }
+
       setState(() {
         _errorMessage = errorMessage;
       });
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
