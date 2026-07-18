@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Covers getTemporaryDirectory() on Android -->
+    <cache-path name="cache" path="." />
+    <!-- Covers getApplicationDocumentsDirectory() -->
+    <files-path name="files" path="." />
+    <!-- Covers external downloads folder used in _handleDownload -->
+    <external-path name="external" path="." />
+</paths>

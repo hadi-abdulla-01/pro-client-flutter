@@ -7,6 +7,7 @@ import '../../../core/company_selector_chip.dart';
 import '../../../core/selected_company_provider.dart';
 import '../../../core/supabase_client.dart';
 import '../../../core/theme.dart';
+import '../../../core/router.dart';
 
 class SupportScreen extends ConsumerStatefulWidget {
   const SupportScreen({super.key});
@@ -226,11 +227,7 @@ class _SupportScreenState extends ConsumerState<SupportScreen> {
               ],
             ),
             actions: [
-              IconButton(
-                icon: const Icon(Icons.notifications_outlined, color: TerraTheme.neutral500),
-                onPressed: () {},
-              ),
-
+              const NotificationBell(),
               const SizedBox(width: 4),
             ],
           ),

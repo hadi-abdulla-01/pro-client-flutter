@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:dio/dio.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../core/supabase_client.dart';
 import '../../../core/selected_company_provider.dart';
 import '../../documents/presentation/document_viewer_screen.dart';
@@ -210,6 +211,102 @@ class _EmployeeDetailScreenState extends ConsumerState<EmployeeDetailScreen> {
     }
   }
 
+  Future<void> _shareDoc(Map<String, dynamic> doc) async {
+    try {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Preparing ${doc['file_name'] ?? 'document'} to share...'),
+            backgroundColor: const Color(0xff316342),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+
+      final String path = doc['file_path'];
+      final String signedUrl = await supabase.storage
+          .from('employee-docs')
+          .createSignedUrl(path, 300);
+
+      // Resolve extension from stored path
+      String extension = '';
+      if (path.contains('.')) {
+        final ext = path.split('.').last.toLowerCase();
+        if (['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'doc', 'docx'].contains(ext)) {
+          extension = ext;
+        }
+      }
+      // Fallback: file name
+      if (extension.isEmpty) {
+        final nameStr = (doc['file_name'] ?? '').toString().toLowerCase();
+        for (final ext in ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'doc', 'docx']) {
+          if (nameStr.endsWith('.$ext')) { extension = ext; break; }
+        }
+      }
+      // Fallback: magic bytes
+      if (extension.isEmpty) {
+        try {
+          final response = await Dio().get<ResponseBody>(
+            signedUrl,
+            options: Options(
+              responseType: ResponseType.stream,
+              headers: {'Range': 'bytes=0-15'},
+              followRedirects: true,
+              validateStatus: (s) => s != null && s < 500,
+            ),
+          );
+          final contentType = response.headers.value('content-type')?.toLowerCase() ?? '';
+          final bytes = List<int>.from(await response.data!.stream.first);
+          if (bytes.length >= 4) {
+            if (bytes[0] == 0x25 && bytes[1] == 0x50 && bytes[2] == 0x44 && bytes[3] == 0x46) extension = 'pdf';
+            else if (bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47) extension = 'png';
+            else if (bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF) extension = 'jpg';
+            else if (bytes[0] == 0x47 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x38) extension = 'gif';
+          }
+          if (extension.isEmpty) {
+            if (contentType.contains('pdf')) extension = 'pdf';
+            else if (contentType.contains('image/png')) extension = 'png';
+            else if (contentType.contains('image/jpeg') || contentType.contains('image/jpg')) extension = 'jpg';
+            else if (contentType.contains('image/gif')) extension = 'gif';
+            else if (contentType.contains('image/webp')) extension = 'webp';
+          }
+        } catch (_) {}
+      }
+      if (extension.isEmpty) extension = 'pdf';
+
+      final tempDir = await getTemporaryDirectory();
+      final fileName = '${doc['file_name'] ?? 'document'}_${DateTime.now().millisecondsSinceEpoch}.$extension';
+      final savePath = '${tempDir.path}/$fileName';
+      await Dio().download(signedUrl, savePath);
+
+      final mimeMap = {
+        'pdf': 'application/pdf',
+        'png': 'image/png',
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'gif': 'image/gif',
+        'webp': 'image/webp',
+        'doc': 'application/msword',
+        'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      };
+      final mimeType = mimeMap[extension] ?? 'application/octet-stream';
+
+      await Share.shareXFiles(
+        [XFile(savePath, mimeType: mimeType)],
+        subject: doc['file_name'] ?? 'Document',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error sharing document: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Widget _buildDocCard(Map<String, dynamic> doc) {
     final title = doc['document_categories']?['name'] ?? 'Document';
     final number = doc['document_number'];
@@ -255,7 +352,7 @@ class _EmployeeDetailScreenState extends ConsumerState<EmployeeDetailScreen> {
                     isExpired
                         ? 'EXPIRED'
                         : isSoon
-                            ? 'EXPIRING'
+                            ? 'EXPIRING SOON'
                             : 'ACTIVE',
                     style: TextStyle(
                       color: statusColor,
@@ -328,6 +425,17 @@ class _EmployeeDetailScreenState extends ConsumerState<EmployeeDetailScreen> {
                       Icon(Icons.download, size: 16, color: Color(0xff316342)),
                       SizedBox(width: 4),
                       Text('Download', style: TextStyle(color: Color(0xff316342), fontWeight: FontWeight.bold, fontSize: 12)),
+                    ],
+                  ),
+                ),
+                Container(width: 1, height: 16, color: Colors.grey.shade300),
+                InkWell(
+                  onTap: () => _shareDoc(doc),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.share_rounded, size: 16, color: Color(0xff316342)),
+                      SizedBox(width: 4),
+                      Text('Share', style: TextStyle(color: Color(0xff316342), fontWeight: FontWeight.bold, fontSize: 12)),
                     ],
                   ),
                 ),
@@ -407,53 +515,62 @@ class _EmployeeDetailScreenState extends ConsumerState<EmployeeDetailScreen> {
                     ),
                     const Divider(color: Colors.white12, height: 24),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        InkWell(
-                          onTap: (_employee!['phone'] != null && _employee!['phone'].toString().isNotEmpty && _employee!['phone'] != 'N/A')
-                              ? () async {
-                                  final Uri url = Uri.parse("tel:${_employee!['phone']}");
-                                  if (await canLaunchUrl(url)) {
-                                    await launchUrl(url);
+                        Expanded(
+                          child: InkWell(
+                            onTap: (_employee!['phone'] != null && _employee!['phone'].toString().isNotEmpty && _employee!['phone'] != 'N/A')
+                                ? () async {
+                                    final Uri url = Uri.parse("tel:${_employee!['phone']}");
+                                    if (await canLaunchUrl(url)) {
+                                      await launchUrl(url);
+                                    }
                                   }
-                                }
-                              : null,
-                          borderRadius: BorderRadius.circular(8),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            child: Column(
-                              children: [
-                                const Icon(Icons.phone, color: Colors.white70, size: 18),
-                                const SizedBox(height: 4),
-                                Text(
-                                  _employee!['phone'] ?? 'N/A',
-                                  style: const TextStyle(color: Colors.white, fontSize: 11),
-                                ),
-                              ],
+                                : null,
+                            borderRadius: BorderRadius.circular(8),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Column(
+                                children: [
+                                  const Icon(Icons.phone, color: Colors.white70, size: 18),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _employee!['phone'] ?? 'N/A',
+                                    style: const TextStyle(color: Colors.white, fontSize: 11),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
-                        InkWell(
-                          onTap: (_employee!['email'] != null && _employee!['email'].toString().isNotEmpty && _employee!['email'] != 'N/A')
-                              ? () async {
-                                  final Uri url = Uri.parse("mailto:${_employee!['email']}");
-                                  if (await canLaunchUrl(url)) {
-                                    await launchUrl(url);
+                        Expanded(
+                          child: InkWell(
+                            onTap: (_employee!['email'] != null && _employee!['email'].toString().isNotEmpty && _employee!['email'] != 'N/A')
+                                ? () async {
+                                    final Uri url = Uri.parse("mailto:${_employee!['email']}");
+                                    if (await canLaunchUrl(url)) {
+                                      await launchUrl(url);
+                                    }
                                   }
-                                }
-                              : null,
-                          borderRadius: BorderRadius.circular(8),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            child: Column(
-                              children: [
-                                const Icon(Icons.email, color: Colors.white70, size: 18),
-                                const SizedBox(height: 4),
-                                Text(
-                                  _employee!['email'] ?? 'N/A',
-                                  style: const TextStyle(color: Colors.white, fontSize: 11),
-                                ),
-                              ],
+                                : null,
+                            borderRadius: BorderRadius.circular(8),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Column(
+                                children: [
+                                  const Icon(Icons.email, color: Colors.white70, size: 18),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _employee!['email'] ?? 'N/A',
+                                    style: const TextStyle(color: Colors.white, fontSize: 11),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),

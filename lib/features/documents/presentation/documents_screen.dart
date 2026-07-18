@@ -6,10 +6,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:dio/dio.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../core/company_selector_chip.dart';
 import '../../../core/selected_company_provider.dart';
 import '../../../core/supabase_client.dart';
 import '../../../core/theme.dart';
+import '../../../core/router.dart';
 import 'document_viewer_screen.dart';
 
 class DocumentsScreen extends ConsumerStatefulWidget {
@@ -317,6 +319,146 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
     }
   }
 
+  Future<void> _handleShare(Map<String, dynamic> doc) async {
+    try {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Preparing ${doc['name'] ?? 'document'} to share...'),
+            backgroundColor: TerraTheme.primary,
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+
+      final String signedUrl = await supabase.storage
+          .from(doc['bucket'])
+          .createSignedUrl(doc['path'], 300);
+
+      // Resolve extension from the stored path
+      String extension = '';
+      final pathStr = (doc['path'] ?? '').toString();
+      if (pathStr.contains('.')) {
+        final ext = pathStr.split('.').last.toLowerCase();
+        if ([
+          'pdf',
+          'jpg',
+          'jpeg',
+          'png',
+          'gif',
+          'webp',
+          'doc',
+          'docx',
+        ].contains(ext)) {
+          extension = ext;
+        }
+      }
+      // Fallback: check file name
+      if (extension.isEmpty) {
+        final nameStr = (doc['name'] ?? '').toString().toLowerCase();
+        for (final ext in [
+          'pdf',
+          'png',
+          'jpg',
+          'jpeg',
+          'gif',
+          'webp',
+          'doc',
+          'docx',
+        ]) {
+          if (nameStr.endsWith('.$ext')) {
+            extension = ext;
+            break;
+          }
+        }
+      }
+      // Fallback: sniff magic bytes
+      if (extension.isEmpty) {
+        try {
+          final response = await Dio().get<ResponseBody>(
+            signedUrl,
+            options: Options(
+              responseType: ResponseType.stream,
+              headers: {'Range': 'bytes=0-15'},
+              followRedirects: true,
+              validateStatus: (s) => s != null && s < 500,
+            ),
+          );
+          final contentType =
+              response.headers.value('content-type')?.toLowerCase() ?? '';
+          final bytes = List<int>.from(await response.data!.stream.first);
+          if (bytes.length >= 4) {
+            if (bytes[0] == 0x25 &&
+                bytes[1] == 0x50 &&
+                bytes[2] == 0x44 &&
+                bytes[3] == 0x46)
+              extension = 'pdf';
+            else if (bytes[0] == 0x89 &&
+                bytes[1] == 0x50 &&
+                bytes[2] == 0x4E &&
+                bytes[3] == 0x47)
+              extension = 'png';
+            else if (bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF)
+              extension = 'jpg';
+            else if (bytes[0] == 0x47 &&
+                bytes[1] == 0x49 &&
+                bytes[2] == 0x46 &&
+                bytes[3] == 0x38)
+              extension = 'gif';
+          }
+          if (extension.isEmpty) {
+            if (contentType.contains('pdf'))
+              extension = 'pdf';
+            else if (contentType.contains('image/png'))
+              extension = 'png';
+            else if (contentType.contains('image/jpeg') ||
+                contentType.contains('image/jpg'))
+              extension = 'jpg';
+            else if (contentType.contains('image/gif'))
+              extension = 'gif';
+            else if (contentType.contains('image/webp'))
+              extension = 'webp';
+          }
+        } catch (_) {}
+      }
+      if (extension.isEmpty) extension = 'pdf';
+
+      // Download to a temp file preserving format
+      final tempDir = await getTemporaryDirectory();
+      final fileName =
+          '${doc['name'] ?? 'document'}_${DateTime.now().millisecondsSinceEpoch}.$extension';
+      final savePath = '${tempDir.path}/$fileName';
+      await Dio().download(signedUrl, savePath);
+
+      // MIME type for share sheet
+      final mimeMap = {
+        'pdf': 'application/pdf',
+        'png': 'image/png',
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'gif': 'image/gif',
+        'webp': 'image/webp',
+        'doc': 'application/msword',
+        'docx':
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      };
+      final mimeType = mimeMap[extension] ?? 'application/octet-stream';
+
+      await Share.shareXFiles([
+        XFile(savePath, mimeType: mimeType),
+      ], subject: doc['name'] ?? 'Document');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error sharing document: $e'),
+            backgroundColor: TerraTheme.error,
+          ),
+        );
+      }
+    }
+  }
+
   String _docStatusLabel(Map<String, dynamic> doc) {
     final expiryStr = doc['expiry'];
     if (expiryStr == null) return 'Active';
@@ -325,7 +467,7 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
     final now = DateTime.now();
     if (expiry.isBefore(now)) return 'Expired';
     if (expiry.isBefore(now.add(const Duration(days: 30))))
-      return 'Review Needed';
+      return 'Expiring Soon';
     return 'Active';
   }
 
@@ -333,7 +475,7 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
     switch (status) {
       case 'Expired':
         return TerraTheme.error;
-      case 'Review Needed':
+      case 'Expiring Soon':
         return TerraTheme.warning;
       default:
         return TerraTheme.success;
@@ -483,7 +625,7 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () {
@@ -508,7 +650,191 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(width: 10),
+                Material(
+                  color: TerraTheme.olive100,
+                  borderRadius: BorderRadius.circular(50),
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.pop(context);
+                      _handleShare(doc);
+                    },
+                    borderRadius: BorderRadius.circular(50),
+                    child: const Padding(
+                      padding: EdgeInsets.all(14),
+                      child: Icon(
+                        Icons.share_rounded,
+                        size: 20,
+                        color: TerraTheme.primary,
+                      ),
+                    ),
+                  ),
+                ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Build a document card widget (reused inside sections)
+  Widget _buildDocCard(Map<String, dynamic> doc) {
+    final status = _docStatusLabel(doc);
+    final statusColor = _docStatusColor(status);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0x1A3D4A2A)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x0A3D4A2A),
+              blurRadius: 16,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: TerraTheme.olive100,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      _categoryIcon(doc['categoryCode']),
+                      color: TerraTheme.primary,
+                      size: 26,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          doc['name'] ?? 'Document',
+                          style: GoogleFonts.nunitoSans(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: TerraTheme.olive900,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          doc['expiry'] != null
+                              ? 'Exp: ${doc['expiry']}'
+                              : 'No Expiry',
+                          style: GoogleFonts.nunitoSans(
+                            fontSize: 13,
+                            color: TerraTheme.neutral500,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(50),
+                          ),
+                          child: Text(
+                            status,
+                            style: GoogleFonts.nunitoSans(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: statusColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1, color: TerraTheme.olive100),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _showDocDetails(doc),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: TerraTheme.olive900,
+                        side: BorderSide.none,
+                        backgroundColor: TerraTheme.olive100,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(50),
+                        ),
+                      ),
+                      icon: const Icon(Icons.visibility_outlined, size: 16),
+                      label: Text(
+                        'View',
+                        style: GoogleFonts.nunitoSans(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => _handleDownload(doc),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: TerraTheme.gold500,
+                        foregroundColor: TerraTheme.charcoal800,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(50),
+                        ),
+                      ),
+                      icon: const Icon(Icons.download_rounded, size: 16),
+                      label: Text(
+                        'Download',
+                        style: GoogleFonts.nunitoSans(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Material(
+                    color: TerraTheme.olive100,
+                    borderRadius: BorderRadius.circular(50),
+                    child: InkWell(
+                      onTap: () => _handleShare(doc),
+                      borderRadius: BorderRadius.circular(50),
+                      child: const Padding(
+                        padding: EdgeInsets.all(10),
+                        child: Icon(
+                          Icons.share_rounded,
+                          size: 18,
+                          color: TerraTheme.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -534,6 +860,7 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
       );
     }
 
+    // Filter logic
     final displayedDocs = _documents.where((doc) {
       final group = doc['groupType'] as String? ?? '';
       // When "All Docs" is selected (null), exclude employee docs for both account types
@@ -552,6 +879,7 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
       return matchCat && matchPartner && matchSearch;
     }).toList();
 
+    // Get sorted list of partner owner names
     final partnerOwnerOptions = <String>{};
     for (final doc in _documents) {
       if (doc['groupType'] == 'partner' &&
@@ -561,6 +889,18 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
       }
     }
     final sortedPartnerOwners = partnerOwnerOptions.toList()..sort();
+
+    // Group partner docs by owner for the "All Partners" view
+    Map<String, List<Map<String, dynamic>>> partnerSections = {};
+    if (_selectedCategoryGroup == 'partner') {
+      for (final doc in displayedDocs) {
+        final owner = doc['ownerName']?.toString() ?? 'Unknown';
+        partnerSections.putIfAbsent(owner, () => []);
+        if (_selectedPartnerOwner == 'all') {
+          partnerSections[owner]!.add(doc);
+        }
+      }
+    }
 
     return Scaffold(
       backgroundColor: TerraTheme.cream50,
@@ -605,17 +945,7 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
                 ),
               ],
             ),
-            actions: [
-              IconButton(
-                icon: const Icon(
-                  Icons.notifications_outlined,
-                  color: TerraTheme.neutral500,
-                ),
-                onPressed: () {},
-              ),
-
-              const SizedBox(width: 4),
-            ],
+            actions: [const NotificationBell(), const SizedBox(width: 4)],
           ),
 
           SliverToBoxAdapter(
@@ -687,9 +1017,17 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
                           _CategoryChip(
                             label: 'Partner Docs',
                             isSelected: _selectedCategoryGroup == 'partner',
-                            onTap: () => setState(
-                              () => _selectedCategoryGroup = 'partner',
-                            ),
+                            onTap: () {
+                              setState(() {
+                                _selectedCategoryGroup = 'partner';
+                                // Default to first partner owner
+                                final firstOwner =
+                                    sortedPartnerOwners.isNotEmpty
+                                    ? sortedPartnerOwners.first
+                                    : 'all';
+                                _selectedPartnerOwner = firstOwner;
+                              });
+                            },
                           ),
                           const SizedBox(width: 8),
                           _CategoryChip(
@@ -736,22 +1074,17 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 20),
+                  // ── Partner filter chips (individual first, All Partners last) ──
                   if (!isIndividual && _selectedCategoryGroup == 'partner') ...[
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 16),
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         children: [
-                          _CategoryChip(
-                            label: 'All Partners',
-                            isSelected: _selectedPartnerOwner == 'all',
-                            onTap: () =>
-                                setState(() => _selectedPartnerOwner = 'all'),
-                          ),
+                          // Individual partners first
                           ...sortedPartnerOwners.map(
                             (owner) => Padding(
-                              padding: const EdgeInsets.only(left: 8),
+                              padding: const EdgeInsets.only(right: 8),
                               child: _CategoryChip(
                                 label: owner,
                                 isSelected: _selectedPartnerOwner == owner,
@@ -761,9 +1094,20 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
                               ),
                             ),
                           ),
+                          // "All Partners" at the end with gold accent
+                          _CategoryChip(
+                            label: 'All Partners',
+                            isSelected: _selectedPartnerOwner == 'all',
+                            onTap: () =>
+                                setState(() => _selectedPartnerOwner = 'all'),
+                            accent: true,
+                          ),
                         ],
                       ),
                     ),
+                    const SizedBox(height: 20),
+                  ] else ...[
+                    const SizedBox(height: 20),
                   ],
                 ],
               ),
@@ -771,200 +1115,75 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
           ),
 
           // ── Document list ─────────────────────────────────────────
-          displayedDocs.isEmpty
-              ? SliverFillRemaining(
-                  child: Center(
-                    child: Text(
-                      'No documents found.',
-                      style: GoogleFonts.nunitoSans(
-                        color: TerraTheme.neutral500,
+          if (displayedDocs.isEmpty)
+            SliverFillRemaining(
+              child: Center(
+                child: Text(
+                  'No documents found.',
+                  style: GoogleFonts.nunitoSans(color: TerraTheme.neutral500),
+                ),
+              ),
+            )
+          else if (_selectedCategoryGroup == 'partner' &&
+              _selectedPartnerOwner == 'all')
+            // Grouped by partner name
+            ...partnerSections.entries.map((entry) {
+              return SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Partner section header
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: TerraTheme.gold500.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.person_outline,
+                              color: TerraTheme.primary,
+                              size: 18,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            entry.key,
+                            style: GoogleFonts.nunitoSans(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: TerraTheme.olive900,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                )
-              : SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate((context, i) {
-                      final doc = displayedDocs[i];
-                      final status = _docStatusLabel(doc);
-                      final statusColor = _docStatusColor(status);
-
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: const Color(0x1A3D4A2A)),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Color(0x0A3D4A2A),
-                                blurRadius: 16,
-                                offset: Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                  16,
-                                  16,
-                                  16,
-                                  12,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 48,
-                                      height: 48,
-                                      decoration: BoxDecoration(
-                                        color: TerraTheme.olive100,
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Icon(
-                                        _categoryIcon(doc['categoryCode']),
-                                        color: TerraTheme.primary,
-                                        size: 26,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 14),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            doc['name'] ?? 'Document',
-                                            style: GoogleFonts.nunitoSans(
-                                              fontSize: 15,
-                                              fontWeight: FontWeight.w700,
-                                              color: TerraTheme.olive900,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          Text(
-                                            doc['expiry'] != null
-                                                ? 'Exp: ${doc['expiry']}'
-                                                : 'No Expiry',
-                                            style: GoogleFonts.nunitoSans(
-                                              fontSize: 13,
-                                              color: TerraTheme.neutral500,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 6),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                              vertical: 3,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: statusColor.withOpacity(
-                                                0.1,
-                                              ),
-                                              borderRadius:
-                                                  BorderRadius.circular(50),
-                                            ),
-                                            child: Text(
-                                              status,
-                                              style: GoogleFonts.nunitoSans(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w700,
-                                                color: statusColor,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const Divider(
-                                height: 1,
-                                color: TerraTheme.olive100,
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                  12,
-                                  10,
-                                  12,
-                                  12,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: OutlinedButton.icon(
-                                        onPressed: () => _showDocDetails(doc),
-                                        style: OutlinedButton.styleFrom(
-                                          foregroundColor: TerraTheme.olive900,
-                                          side: BorderSide.none,
-                                          backgroundColor: TerraTheme.olive100,
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 10,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              50,
-                                            ),
-                                          ),
-                                        ),
-                                        icon: const Icon(
-                                          Icons.visibility_outlined,
-                                          size: 16,
-                                        ),
-                                        label: Text(
-                                          'View',
-                                          style: GoogleFonts.nunitoSans(
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: ElevatedButton.icon(
-                                        onPressed: () => _handleDownload(doc),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: TerraTheme.gold500,
-                                          foregroundColor:
-                                              TerraTheme.charcoal800,
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 10,
-                                          ),
-                                          elevation: 0,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              50,
-                                            ),
-                                          ),
-                                        ),
-                                        icon: const Icon(
-                                          Icons.download_rounded,
-                                          size: 16,
-                                        ),
-                                        label: Text(
-                                          'Download',
-                                          style: GoogleFonts.nunitoSans(
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }, childCount: displayedDocs.length),
-                  ),
+                    // Partner docs
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                      child: Column(
+                        children: entry.value.map(_buildDocCard).toList(),
+                      ),
+                    ),
+                  ],
                 ),
+              );
+            })
+          else
+            // Flat list for non-partner views or single partner view
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate((context, i) {
+                  final doc = displayedDocs[i];
+                  return _buildDocCard(doc);
+                }, childCount: displayedDocs.length),
+              ),
+            ),
         ],
       ),
     );
@@ -975,22 +1194,32 @@ class _CategoryChip extends StatelessWidget {
   final String label;
   final bool isSelected;
   final VoidCallback onTap;
+  final bool accent; // For "All Partners" chip
 
   const _CategoryChip({
     required this.label,
     required this.isSelected,
     required this.onTap,
+    this.accent = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    // For "All Partners" chip at the end, use accent gold colors when selected
+    Color bgColor;
+    if (isSelected) {
+      bgColor = accent ? TerraTheme.gold500 : TerraTheme.gold200;
+    } else {
+      bgColor = TerraTheme.olive100;
+    }
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? TerraTheme.gold200 : TerraTheme.olive100,
+          color: bgColor,
           borderRadius: BorderRadius.circular(50),
         ),
         child: Text(

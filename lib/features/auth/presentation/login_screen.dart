@@ -39,7 +39,8 @@ class _LoginScreenState extends State<LoginScreen> {
             .eq('id', res.user!.id)
             .single();
 
-        final hasAccess = profile['roles']['name'] == 'client' &&
+        final hasAccess =
+            profile['roles']['name'] == 'client' &&
             (profile['company_id'] != null || profile['group_id'] != null);
 
         if (!hasAccess) {
@@ -57,7 +58,10 @@ class _LoginScreenState extends State<LoginScreen> {
         if (errorStr.contains('invalid login credentials')) {
           _errorMessage = 'Incorrect email or password. Please try again.';
         } else {
-          _errorMessage = e.toString().replaceAll('Exception: ', '').replaceAll('AuthException: ', '');
+          _errorMessage = e
+              .toString()
+              .replaceAll('Exception: ', '')
+              .replaceAll('AuthException: ', '');
         }
       });
     } finally {
@@ -179,15 +183,24 @@ class _LoginScreenState extends State<LoginScreen> {
                         // Error
                         if (_errorMessage != null) ...[
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
                             decoration: BoxDecoration(
                               color: TerraTheme.error.withOpacity(0.08),
                               borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: TerraTheme.error.withOpacity(0.3)),
+                              border: Border.all(
+                                color: TerraTheme.error.withOpacity(0.3),
+                              ),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.error_outline, color: TerraTheme.error, size: 16),
+                                const Icon(
+                                  Icons.error_outline,
+                                  color: TerraTheme.error,
+                                  size: 16,
+                                ),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
@@ -220,27 +233,42 @@ class _LoginScreenState extends State<LoginScreen> {
                               color: TerraTheme.neutral500,
                               fontSize: 13,
                             ),
-                            prefixIcon: const Icon(Icons.email_outlined, size: 18, color: TerraTheme.neutral500),
+                            prefixIcon: const Icon(
+                              Icons.email_outlined,
+                              size: 18,
+                              color: TerraTheme.neutral500,
+                            ),
                             isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 14,
+                            ),
                             filled: true,
                             fillColor: TerraTheme.cream50,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: TerraTheme.olive100),
+                              borderSide: const BorderSide(
+                                color: TerraTheme.olive100,
+                              ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: TerraTheme.olive100),
+                              borderSide: const BorderSide(
+                                color: TerraTheme.olive100,
+                              ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: TerraTheme.primary, width: 1.5),
+                              borderSide: const BorderSide(
+                                color: TerraTheme.primary,
+                                width: 1.5,
+                              ),
                             ),
                           ),
                           validator: (v) {
-                            if (v == null || v.isEmpty) return 'Please enter your email';
-                            if (!v.contains('@')) return 'Invalid email address';
+                            if (v == null || v.isEmpty)
+                              return 'Please enter your email';
+                            if (!v.contains('@'))
+                              return 'Invalid email address';
                             return null;
                           },
                         ),
@@ -261,38 +289,75 @@ class _LoginScreenState extends State<LoginScreen> {
                               color: TerraTheme.neutral500,
                               fontSize: 13,
                             ),
-                            prefixIcon: const Icon(Icons.lock_outline, size: 18, color: TerraTheme.neutral500),
+                            prefixIcon: const Icon(
+                              Icons.lock_outline,
+                              size: 18,
+                              color: TerraTheme.neutral500,
+                            ),
                             suffixIcon: IconButton(
                               icon: Icon(
-                                _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                _obscurePassword
+                                    ? Icons.visibility_off_outlined
+                                    : Icons.visibility_outlined,
                                 size: 18,
                                 color: TerraTheme.neutral500,
                               ),
-                              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                              onPressed: () => setState(
+                                () => _obscurePassword = !_obscurePassword,
+                              ),
                             ),
                             isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 14,
+                            ),
                             filled: true,
                             fillColor: TerraTheme.cream50,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: TerraTheme.olive100),
+                              borderSide: const BorderSide(
+                                color: TerraTheme.olive100,
+                              ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: TerraTheme.olive100),
+                              borderSide: const BorderSide(
+                                color: TerraTheme.olive100,
+                              ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: TerraTheme.primary, width: 1.5),
+                              borderSide: const BorderSide(
+                                color: TerraTheme.primary,
+                                width: 1.5,
+                              ),
                             ),
                           ),
                           validator: (v) {
-                            if (v == null || v.isEmpty) return 'Please enter your password';
-                            if (v.length < 6) return 'Password must be at least 6 characters';
+                            if (v == null || v.isEmpty)
+                              return 'Please enter your password';
+                            if (v.length < 6)
+                              return 'Password must be at least 6 characters';
                             return null;
                           },
                         ),
+                        const SizedBox(height: 16),
+
+                        // Forgot Password
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: () => context.push('/forgot-password'),
+                            child: Text(
+                              'Forgot Password?',
+                              style: GoogleFonts.nunitoSans(
+                                color: TerraTheme.primary,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+
                         const SizedBox(height: 24),
 
                         // Sign In Button
@@ -314,7 +379,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                     width: 20,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation(Colors.white),
+                                      valueColor: AlwaysStoppedAnimation(
+                                        Colors.white,
+                                      ),
                                     ),
                                   )
                                 : Text(

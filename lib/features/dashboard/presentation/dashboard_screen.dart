@@ -8,6 +8,7 @@ import '../../../core/supabase_client.dart';
 import '../../../core/theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../core/router.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -308,22 +309,21 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
             titleSpacing: 16,
             title: Row(
               children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: TerraTheme.olive900,
-                  backgroundImage: (_company?['logo_url'] != null && _company!['logo_url'].toString().isNotEmpty)
-                      ? NetworkImage(_company!['logo_url'])
-                      : null,
-                  child: (_company?['logo_url'] == null || _company!['logo_url'].toString().isEmpty)
-                      ? Center(
-                          child: Text('PR',
-                              style: GoogleFonts.nunitoSans(
-                                color: TerraTheme.gold500,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                              )),
-                        )
-                      : null,
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: const BoxDecoration(
+                    color: TerraTheme.olive900,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text('PR',
+                        style: GoogleFonts.nunitoSans(
+                          color: TerraTheme.gold500,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        )),
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Text('PRO Services',
@@ -335,24 +335,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
               ],
             ),
             actions: [
-              IconButton(
-                icon: Stack(children: [
-                  const Icon(Icons.notifications_outlined, color: TerraTheme.olive900, size: 26),
-                  Positioned(
-                    top: 2, right: 2,
-                    child: Container(
-                      width: 8, height: 8,
-                      decoration: BoxDecoration(
-                        color: const Color(0xff834751),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 1.5),
-                      ),
-                    ),
-                  ),
-                ]),
-                onPressed: () {},
-              ),
-
+              const NotificationBell(),
               const SizedBox(width: 4),
             ],
           ),

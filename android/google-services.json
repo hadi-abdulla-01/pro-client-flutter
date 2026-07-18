@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "300730639558",
+    "project_id": "proapp-cae83",
+    "storage_bucket": "proapp-cae83.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:300730639558:android:23f55590aa10daa67e23c7",
+        "android_client_info": {
+          "package_name": "com.proservices.portal.pro_client_flutterapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBKBnRP3qkwAUEwWTgjdU4bNHmDIE5Hfqc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

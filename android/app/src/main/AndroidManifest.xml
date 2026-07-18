@@ -1,6 +1,7 @@
 ﻿<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- REQUIRED: Internet access for Supabase -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Required to show notifications on Android 13+ -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
     <application
         android:label="PRO Services"
@@ -25,10 +26,34 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- Default FCM notification channel (used when app is backgrounded/killed) -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="pro_services_channel" />
+
+        <!-- Default small icon for system-displayed FCM notifications -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@mipmap/ic_launcher" />
+
+
+        <!-- Required by share_plus to share files via content URIs -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_provider_paths" />
+        </provider>
     </application>
+
     <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>

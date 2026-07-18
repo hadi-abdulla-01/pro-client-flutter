@@ -47,6 +47,12 @@ dependencies:
   open_filex: ^4.7.0
   path_provider: ^2.1.5
   syncfusion_flutter_pdfviewer: ^33.2.13
+  share_plus: ^10.1.4
+  flutter_local_notifications: ^19.3.0
+  firebase_core: ^4.12.1
+  firebase_messaging: ^16.4.3
+  shared_preferences: ^2.5.5
+
 
 dev_dependencies:
   flutter_test:
