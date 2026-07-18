@@ -25,19 +25,41 @@ final isIndividualProvider = Provider<bool>((ref) {
 // Loading state for fetching user companies list
 final companiesLoadingProvider = StateProvider<bool>((ref) => false);
 
+// Whether the current user has been blocked by an admin.
+// Defaults to false; set during fetchUserCompanies.
+final isBlockedProvider = StateProvider<bool>((ref) => false);
+
 Future<void> fetchUserCompanies(WidgetRef ref) async {
   ref.read(companiesLoadingProvider.notifier).state = true;
   try {
     final userId = supabase.auth.currentUser?.id;
     if (userId == null) return;
     
-    // Fetch profile
-    final profileRes = await supabase
-        .from('users')
-        .select('company_id, group_id')
-        .eq('id', userId)
-        .single();
-        
+    // Fetch profile — try to include is_blocked; fall back gracefully if the
+    // column doesn't exist yet in the database.
+    Map<String, dynamic> profileRes;
+    try {
+      profileRes = await supabase
+          .from('users')
+          .select('company_id, group_id, is_blocked')
+          .eq('id', userId)
+          .single();
+    } catch (_) {
+      // Column may not exist — retry without it so data still loads
+      profileRes = await supabase
+          .from('users')
+          .select('company_id, group_id')
+          .eq('id', userId)
+          .single();
+    }
+
+    // Persist blocked status — safe even when the column doesn't exist yet
+    final blocked = profileRes['is_blocked'] == true;
+    ref.read(isBlockedProvider.notifier).state = blocked;
+
+    // Always continue loading companies regardless of blocked status.
+    // The dashboard will show the blocked banner while still rendering
+    // the shell (no data queries run in blocked state).
     final companyId = profileRes['company_id'];
     final groupId = profileRes['group_id'];
     

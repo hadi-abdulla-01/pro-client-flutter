@@ -46,6 +46,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/reset-password',
         builder: (context, state) => const ResetPasswordScreen(),
       ),
+      // Stand-alone blocked screen — outside the ShellRoute so the bottom
+      // nav is never shown to a blocked user.
+      GoRoute(
+        path: '/blocked',
+        builder: (context, state) => const BlockedScreen(),
+      ),
       ShellRoute(
         pageBuilder: (context, state, child) {
           return CustomTransitionPage<void>(
@@ -439,6 +445,12 @@ class _AppShellState extends ConsumerState<AppShell> {
       );
     }
 
+    // If admin blocked this user, show the blocked screen — no nav, no content.
+    final isBlocked = ref.watch(isBlockedProvider);
+    if (isBlocked) {
+      return const BlockedScreen();
+    }
+
     final isIndividual = ref.watch(isIndividualProvider);
     final unreadCount = ref.watch(unreadNotifCountProvider);
 
@@ -530,6 +542,137 @@ class NotificationBell extends ConsumerWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Blocked Screen ────────────────────────────────────────────────────────────
+// Shown when is_blocked = true on the user's record in Supabase.
+// No navigation bar, no back button — just the message and a sign-out button.
+class BlockedScreen extends ConsumerWidget {
+  const BlockedScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Scaffold(
+      backgroundColor: const Color(0xfff5f5f0),
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Icon
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: const Color(0xfffdecea),
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: const Icon(
+                    Icons.block_rounded,
+                    size: 44,
+                    color: Color(0xffc0392b),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Title
+                const Text(
+                  'Account Blocked',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xff2b2b26),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+
+                // Message
+                const Text(
+                  'Your account has been blocked by the admin.\nPlease contact your administrator for assistance.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Color(0xff6b6b60),
+                    height: 1.6,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+
+                // Contact hint
+                Container(
+                  margin: const EdgeInsets.only(top: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xfffff8e1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xffffecb3)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.info_outline_rounded,
+                        size: 16,
+                        color: Color(0xfff57f17),
+                      ),
+                      SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          'Contact your PRO Services admin to restore access.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xfff57f17),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 32),
+
+                // Sign out button
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      await supabase.auth.signOut();
+                      // Reset blocked state so the provider is clean on next login
+                      ref.read(isBlockedProvider.notifier).state = false;
+                      if (context.mounted) context.go('/login');
+                    },
+                    icon: const Icon(Icons.logout_rounded, size: 18),
+                    label: const Text(
+                      'Sign Out',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xff316342),
+                      side: const BorderSide(color: Color(0xff316342)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

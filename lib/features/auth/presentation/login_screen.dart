@@ -48,6 +48,14 @@ class _LoginScreenState extends State<LoginScreen> {
             _errorMessage = 'Access Denied: You do not have client access.';
           });
           await supabase.auth.signOut();
+        } else if (profile['is_blocked'] == true) {
+          // Blocked users get signed out with a clear message — they must not
+          // reach the app shell at all.
+          setState(() {
+            _errorMessage =
+                'Your account has been blocked by the admin. Please contact your administrator.';
+          });
+          await supabase.auth.signOut();
         } else {
           if (mounted) context.go('/');
         }

@@ -281,11 +281,123 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     // Watch availableCompaniesProvider so we rebuild if it loads/updates
     ref.watch(availableCompaniesProvider);
 
+    // Check blocked status — show banner overlay on dashboard
+    final isBlocked = ref.watch(isBlockedProvider);
+
     if (_isLoading) {
       return const Scaffold(
         backgroundColor: TerraTheme.cream50,
         body: Center(
           child: CircularProgressIndicator(color: TerraTheme.gold500),
+        ),
+      );
+    }
+
+    // Blocked users see only the blocked banner — no data, no navigation content
+    if (isBlocked) {
+      return Scaffold(
+        backgroundColor: TerraTheme.cream50,
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: const Color(0xfffdecea),
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: const Icon(
+                      Icons.block_rounded,
+                      size: 44,
+                      color: Color(0xffc0392b),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Account Blocked',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xff2b2b26),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Your account has been blocked by the admin.\nPlease contact your administrator for assistance.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Color(0xff6b6b60),
+                      height: 1.6,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xfffff8e1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xffffecb3)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.info_outline_rounded,
+                            size: 16, color: Color(0xfff57f17)),
+                        SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            'Contact your PRO Services admin to restore access.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xfff57f17),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        await supabase.auth.signOut();
+                        ref.read(isBlockedProvider.notifier).state = false;
+                        if (context.mounted) context.go('/login');
+                      },
+                      icon: const Icon(Icons.logout_rounded, size: 18),
+                      label: const Text(
+                        'Sign Out',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xff316342),
+                        side: const BorderSide(color: Color(0xff316342)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       );
     }
