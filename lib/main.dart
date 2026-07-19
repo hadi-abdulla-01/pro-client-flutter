@@ -65,7 +65,7 @@ class MyApp extends ConsumerWidget {
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
-      title: 'PRO Portal Client',
+      title: 'Amanah',
       theme: TerraTheme.lightTheme,
       routerConfig: router,
       debugShowCheckedModeBanner: false,

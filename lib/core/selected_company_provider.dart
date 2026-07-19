@@ -35,17 +35,17 @@ Future<void> fetchUserCompanies(WidgetRef ref) async {
     final userId = supabase.auth.currentUser?.id;
     if (userId == null) return;
     
-    // Fetch profile — try to include is_blocked; fall back gracefully if the
-    // column doesn't exist yet in the database.
+    // Fetch profile — read both `status` (set by the admin webapp) and
+    // `is_blocked` (boolean kept in sync). Either one triggers the block gate.
     Map<String, dynamic> profileRes;
     try {
       profileRes = await supabase
           .from('users')
-          .select('company_id, group_id, is_blocked')
+          .select('company_id, group_id, status, is_blocked')
           .eq('id', userId)
           .single();
     } catch (_) {
-      // Column may not exist — retry without it so data still loads
+      // Columns may not exist yet — retry with minimal fields
       profileRes = await supabase
           .from('users')
           .select('company_id, group_id')
@@ -53,8 +53,10 @@ Future<void> fetchUserCompanies(WidgetRef ref) async {
           .single();
     }
 
-    // Persist blocked status — safe even when the column doesn't exist yet
-    final blocked = profileRes['is_blocked'] == true;
+    // Blocked if either field says so
+    final blocked =
+        profileRes['is_blocked'] == true ||
+        profileRes['status'] == 'blocked';
     ref.read(isBlockedProvider.notifier).state = blocked;
 
     // Always continue loading companies regardless of blocked status.

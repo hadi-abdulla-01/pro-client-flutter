@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/supabase_client.dart';
@@ -168,24 +169,23 @@ class _ActionRequiredScreenState extends ConsumerState<ActionRequiredScreen> {
         ),
         title: Row(
           children: [
-            CircleAvatar(
-              radius: 20,
-              backgroundColor: TerraTheme.olive900,
-              backgroundImage: (logoUrl != null && logoUrl.toString().isNotEmpty)
-                  ? NetworkImage(logoUrl)
-                  : null,
-              child: (logoUrl == null || logoUrl.toString().isEmpty)
-                  ? Center(
-                      child: Text('PR',
-                          style: GoogleFonts.nunitoSans(
-                            color: TerraTheme.gold500,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                          )),
-                    )
-                  : null,
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: const [
+                  BoxShadow(color: Color(0x1A3D4A2A), blurRadius: 6, offset: Offset(0, 2)),
+                ],
+              ),
+              padding: const EdgeInsets.all(4),
+              child: SvgPicture.asset(
+                'assets/images/Amanah.svg',
+                fit: BoxFit.contain,
+              ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Text('Action Required',
                 style: GoogleFonts.nunitoSans(
                   color: TerraTheme.olive900,

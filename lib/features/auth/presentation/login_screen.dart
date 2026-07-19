@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/supabase_client.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme.dart';
@@ -102,49 +103,33 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   // Brand Header
                   Center(
-                    child: Row(
+                    child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: TerraTheme.primary,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            'PR',
-                            style: GoogleFonts.playfairDisplay(
-                              color: TerraTheme.gold500,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1,
-                            ),
+                        SvgPicture.asset(
+                          'assets/images/Amanah.svg',
+                          width: 72,
+                          height: 72,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Amanah',
+                          style: GoogleFonts.playfairDisplay(
+                            color: TerraTheme.charcoal800,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            height: 1.1,
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'PRO Services',
-                              style: GoogleFonts.playfairDisplay(
-                                color: TerraTheme.charcoal800,
-                                fontSize: 20,
-                                fontWeight: FontWeight.w800,
-                                height: 1.1,
-                              ),
-                            ),
-                            Text(
-                              'Client Portal',
-                              style: GoogleFonts.nunitoSans(
-                                color: TerraTheme.neutral500,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
+                        const SizedBox(height: 2),
+                        Text(
+                          'ALL YOUR DOCUMENTS, ONE PLATFORM',
+                          style: GoogleFonts.nunitoSans(
+                            color: TerraTheme.primary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.8,
+                          ),
                         ),
                       ],
                     ),
@@ -410,7 +395,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   Center(
                     child: Text(
-                      'Powered by PRO Services',
+                      'Powered by Amanah',
                       style: GoogleFonts.nunitoSans(
                         color: TerraTheme.neutral500,
                         fontSize: 11,

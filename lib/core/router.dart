@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel, PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType;
 import '../features/auth/presentation/login_screen.dart';
 import '../features/auth/presentation/forgot_password_screen.dart';
 import '../features/auth/presentation/reset_password_screen.dart';
@@ -182,12 +183,15 @@ class _AppShellState extends ConsumerState<AppShell> {
   int _currentIndex = 0;
   final _appLinks = AppLinks();
   bool _isNavigatingToReset = false;
+  // Real-time channel that watches the current user's row for block changes
+  RealtimeChannel? _userStatusChannel;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await fetchUserCompanies(ref);
+      _subscribeUserStatus();   // ← live block/unblock detection
       _subscribeNotifications();
       _fetchUnreadCount();
       _setupPushNotifications();
@@ -199,8 +203,42 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   @override
   void dispose() {
+    _userStatusChannel?.unsubscribe();
     NotificationService.instance.unsubscribe();
     super.dispose();
+  }
+
+  // ─── Real-time block/unblock detection ───────────────────────────────────
+  // Subscribes to postgres_changes on the user's own row.
+  // When the admin sets status='blocked' or is_blocked=true, the app
+  // immediately updates isBlockedProvider so the blocked screen appears
+  // without requiring a restart or re-login.
+  void _subscribeUserStatus() {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return;
+
+    _userStatusChannel = supabase
+        .channel('user-status-$userId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'users',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'id',
+            value: userId,
+          ),
+          callback: (payload) {
+            final newRow = payload.newRecord;
+            final blocked =
+                newRow['is_blocked'] == true ||
+                newRow['status'] == 'blocked';
+            if (mounted) {
+              ref.read(isBlockedProvider.notifier).state = blocked;
+            }
+          },
+        )
+        .subscribe();
   }
 
   // ─── Push Notifications Setup ───────────────────────────────────────────────

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/company_selector_chip.dart';
@@ -106,6 +107,107 @@ class _SupportScreenState extends ConsumerState<SupportScreen> {
     }
   }
 
+  Future<void> _navigateToRaiseRenewal() async {
+    // Show a brief loading indicator while we fetch the alerts
+    setState(() => _isLoading = true);
+    try {
+      final companies = ref.read(availableCompaniesProvider);
+      final selectedId = ref.read(selectedCompanyIdProvider);
+
+      if (companies.isEmpty) {
+        if (mounted) context.push('/action_required', extra: <Map<String, dynamic>>[]);
+        return;
+      }
+
+      List<String> targetCompanyIds = selectedId != null
+          ? [selectedId]
+          : companies.map((c) => c['id'] as String).toList();
+
+      // Fetch employees
+      final employeesRes = await supabase
+          .from('employees')
+          .select('*')
+          .inFilter('company_id', targetCompanyIds);
+      final List employees = employeesRes;
+
+      // Fetch company-level documents
+      final compDocsRes = await supabase
+          .from('company_documents')
+          .select('*, document_categories(name)')
+          .inFilter('company_id', targetCompanyIds);
+      final List compDocs = compDocsRes;
+
+      // Fetch employee-level documents
+      final empIds = employees.map((e) => e['id']).toList();
+      List empDocs = [];
+      if (empIds.isNotEmpty) {
+        final empDocsRes = await supabase
+            .from('employee_documents')
+            .select('*, employees(first_name, last_name), document_categories(name)')
+            .inFilter('employee_id', empIds);
+        empDocs = empDocsRes;
+      }
+
+      // Fetch active renewal requests for status mapping
+      final renewalsRes = await supabase
+          .from('renewal_requests')
+          .select('id, employee_id, document_category_id, status')
+          .inFilter('company_id', targetCompanyIds)
+          .inFilter('status', ['pending', 'requested', 'in_progress']);
+      final List renewals = renewalsRes;
+
+      final today = DateTime.now();
+      final thirtyDays = today.add(const Duration(days: 30));
+      final allDocs = [...compDocs, ...empDocs];
+      final List<Map<String, dynamic>> alerts = [];
+
+      for (var doc in allDocs) {
+        final expiryStr = doc['expiry_date'];
+        if (expiryStr == null) continue;
+        final expiry = DateTime.tryParse(expiryStr.toString());
+        if (expiry == null) continue;
+
+        // Only include expired or expiring-soon docs
+        final bool isExpired = expiry.isBefore(today);
+        final bool isExpiringSoon = !isExpired && expiry.isBefore(thirtyDays);
+        if (!isExpired && !isExpiringSoon) continue;
+
+        final ownerName = doc['employees'] != null
+            ? "${doc['employees']['first_name']} ${doc['employees']['last_name']}"
+            : "Company Level";
+
+        // Find matching active renewal request
+        Map<String, dynamic>? activeRenewal;
+        for (var r in renewals) {
+          if (r['document_category_id'] == doc['category_id'] &&
+              r['employee_id'] == doc['employee_id']) {
+            activeRenewal = r;
+            break;
+          }
+        }
+
+        alerts.add({
+          'name': doc['file_name'] ?? doc['document_categories']['name'],
+          'owner': ownerName,
+          'expiry': expiryStr,
+          'daysLeft': expiry.difference(today).inDays,
+          'status': isExpired ? 'expired' : 'expiring_soon',
+          'doc': doc,
+          'renewalStatus': activeRenewal?['status'],
+        });
+      }
+
+      alerts.sort((a, b) => (a['daysLeft'] as int).compareTo(b['daysLeft'] as int));
+
+      if (mounted) context.push('/action_required', extra: alerts);
+    } catch (e) {
+      debugPrint("Error fetching alerts for renewal: $e");
+      if (mounted) context.push('/action_required', extra: <Map<String, dynamic>>[]);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   Future<void> _launchWhatsApp() async {
     final uri = Uri.parse("https://wa.me/${_whatsappNumber.replaceAll(' ', '').replaceAll('+', '')}");
     try {
@@ -202,23 +304,23 @@ class _SupportScreenState extends ConsumerState<SupportScreen> {
             title: Row(
               children: [
                 Container(
-                  width: 40,
-                  height: 40,
-                  decoration: const BoxDecoration(
-                    color: TerraTheme.olive900,
-                    shape: BoxShape.circle,
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: const [
+                      BoxShadow(color: Color(0x1A3D4A2A), blurRadius: 6, offset: Offset(0, 2)),
+                    ],
                   ),
-                  child: Center(
-                    child: Text('PR',
-                        style: GoogleFonts.nunitoSans(
-                          color: TerraTheme.gold500,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                        )),
+                  padding: const EdgeInsets.all(4),
+                  child: SvgPicture.asset(
+                    'assets/images/Amanah.svg',
+                    fit: BoxFit.contain,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Text('PRO Services',
+                const SizedBox(width: 10),
+                Text('Amanah',
                     style: GoogleFonts.nunitoSans(
                       color: TerraTheme.olive900,
                       fontWeight: FontWeight.w800,
@@ -329,7 +431,7 @@ class _SupportScreenState extends ConsumerState<SupportScreen> {
                         iconBg: const Color(0x1AC9A227),
                         iconColor: TerraTheme.gold500,
                         label: 'Raise Renewal',
-                        onTap: () => context.push('/support/renew'),
+                        onTap: _navigateToRaiseRenewal,
                       ),
                       _ChannelCard(
                         icon: Icons.emergency_outlined,

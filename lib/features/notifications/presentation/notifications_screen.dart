@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/supabase_client.dart';
 import '../../../core/selected_company_provider.dart';
@@ -211,27 +212,25 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         title: Row(
           children: [
             Container(
-              width: 40,
-              height: 40,
-              decoration: const BoxDecoration(
-                color: TerraTheme.olive900,
-                shape: BoxShape.circle,
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: const [
+                  BoxShadow(color: Color(0x1A3D4A2A), blurRadius: 6, offset: Offset(0, 2)),
+                ],
               ),
-              child: Center(
-                child: Text(
-                  'PR',
-                  style: GoogleFonts.nunitoSans(
-                    color: TerraTheme.gold500,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                  ),
-                ),
+              padding: const EdgeInsets.all(4),
+              child: SvgPicture.asset(
+                'assets/images/Amanah.svg',
+                fit: BoxFit.contain,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Flexible(
               child: Text(
-                'PRO Services',
+                'Amanah',
                 style: GoogleFonts.nunitoSans(
                   color: TerraTheme.olive900,
                   fontWeight: FontWeight.w800,
