@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../../core/company_selector_chip.dart';
 import '../../../core/selected_company_provider.dart';
 import '../../../core/supabase_client.dart';
@@ -175,6 +176,30 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
 
   Future<void> _handleDownload(Map<String, dynamic> doc) async {
     try {
+      // Request storage permissions on Android
+      if (Platform.isAndroid) {
+        final status = await Permission.storage.request();
+        if (!status.isGranted) {
+          final manageStatus = await Permission.manageExternalStorage.request();
+          if (!manageStatus.isGranted) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Storage permission is required to download files'),
+                  backgroundColor: TerraTheme.error,
+                  action: SnackBarAction(
+                    label: 'Settings',
+                    textColor: Colors.white,
+                    onPressed: () => openAppSettings(),
+                  ),
+                ),
+              );
+            }
+            return;
+          }
+        }
+      }
+
       // Show downloading message
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -189,7 +214,10 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
       final String signedUrl = await supabase.storage
           .from(doc['bucket'])
           .createSignedUrl(doc['path'], 300);
-      final extension = await FileUtils.getFileExtension(
+      
+      // Use improved extension detection
+      final extension = await FileUtils.detectExtensionFromUrl(
+        signedUrl,
         doc['name'] as String? ?? 'file',
       );
 
@@ -200,7 +228,7 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
       await saveDir.create(recursive: true);
 
       final String fileName =
-          "${doc['name'] ?? 'doc'}_${DateTime.now().millisecondsSinceEpoch}.$extension";
+          "${doc['name'] ?? 'doc'}_${DateTime.now().millisecondsSinceEpoch}$extension";
       final String savePath = "${saveDir.path}/$fileName";
 
       await Dio().download(signedUrl, savePath);
@@ -241,14 +269,17 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
       final String signedUrl = await supabase.storage
           .from(doc['bucket'])
           .createSignedUrl(doc['path'], 300);
-      final extension = await FileUtils.getFileExtension(
+      
+      // Use improved extension detection
+      final extension = await FileUtils.detectExtensionFromUrl(
+        signedUrl,
         doc['name'] as String? ?? 'file',
       );
 
       // Download to a temp file preserving format
       final tempDir = await getTemporaryDirectory();
       final fileName =
-          '${doc['name'] ?? 'document'}_${DateTime.now().millisecondsSinceEpoch}.$extension';
+          '${doc['name'] ?? 'document'}_${DateTime.now().millisecondsSinceEpoch}$extension';
       final savePath = '${tempDir.path}/$fileName';
       await Dio().download(signedUrl, savePath);
 
