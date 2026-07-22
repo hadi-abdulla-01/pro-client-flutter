@@ -28,6 +28,8 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
   _selectedCategoryGroup; // null = 'All Docs', 'company'|'partner'|'employee' (corporate) or 'family'|'relative' (individual)
   String _searchQuery = '';
   String _selectedPartnerOwner = 'all';
+  String?
+  _selectedStatusFilter; // null: all, 'expired', 'expiring_soon', 'active'
   List<Map<String, dynamic>> _documents = [];
   final TextEditingController _searchController = TextEditingController();
 
@@ -73,7 +75,8 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
         final compDocsRes = await supabase
             .from('company_documents')
             .select('*, document_categories(*)')
-            .inFilter('company_id', targetCompanyIds);
+            .inFilter('company_id', targetCompanyIds)
+            .order('order_index', ascending: true);
         final List compDocs = compDocsRes;
 
         final employeesRes = await supabase
@@ -89,7 +92,8 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
               .select(
                 '*, employees(first_name, last_name), document_categories(*)',
               )
-              .inFilter('employee_id', empIds);
+              .inFilter('employee_id', empIds)
+              .order('order_index', ascending: true);
           empDocs = empDocsRes;
         }
 
@@ -113,6 +117,9 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
             'bucket': 'company-docs',
             'groupType': group, // 'company' | 'partner' | 'family'
             'ownerName': doc['owner_name'],
+            // Preserve server-side order_index so the web app's drag-and-drop
+            // arrangement is maintained when documents are displayed.
+            'orderIndex': doc['order_index'] ?? 0,
           });
         }
         for (var doc in empDocs) {
@@ -135,6 +142,9 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
             'path': doc['file_path'],
             'bucket': 'employee-docs',
             'groupType': group, // 'employee' | 'relative'
+            // Preserve server-side order_index so the web app's drag-and-drop
+            // arrangement is maintained when documents are displayed.
+            'orderIndex': doc['order_index'] ?? 0,
           });
         }
       }
@@ -185,7 +195,9 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('Storage permission is required to download files'),
+                  content: Text(
+                    'Storage permission is required to download files',
+                  ),
                   backgroundColor: TerraTheme.error,
                   action: SnackBarAction(
                     label: 'Settings',
@@ -214,7 +226,7 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
       final String signedUrl = await supabase.storage
           .from(doc['bucket'])
           .createSignedUrl(doc['path'], 300);
-      
+
       // Use improved extension detection
       final extension = await FileUtils.detectExtensionFromUrl(
         signedUrl,
@@ -269,7 +281,7 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
       final String signedUrl = await supabase.storage
           .from(doc['bucket'])
           .createSignedUrl(doc['path'], 300);
-      
+
       // Use improved extension detection
       final extension = await FileUtils.detectExtensionFromUrl(
         signedUrl,
@@ -307,8 +319,9 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
     if (expiry == null) return 'Active';
     final now = DateTime.now();
     if (expiry.isBefore(now)) return 'Expired';
-    if (expiry.isBefore(now.add(const Duration(days: 30))))
+    if (expiry.isBefore(now.add(const Duration(days: 30)))) {
       return 'Expiring Soon';
+    }
     return 'Active';
   }
 
@@ -336,6 +349,182 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
       default:
         return Icons.insert_drive_file_outlined;
     }
+  }
+
+  void _navigateToManageDocuments(
+    List<Map<String, dynamic>> docs,
+    String groupTitle,
+  ) {
+    // Show a read-only bottom sheet listing the documents in this group
+    // in the order set by the web app (order_index from DB).
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.92,
+        expand: false,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: TerraTheme.cream50,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              // Handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(top: 12, bottom: 16),
+                  decoration: BoxDecoration(
+                    color: TerraTheme.olive100,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Row(
+                  children: [
+                    Text(
+                      groupTitle,
+                      style: GoogleFonts.nunitoSans(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: TerraTheme.olive900,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${docs.length} doc${docs.length == 1 ? '' : 's'}',
+                      style: GoogleFonts.nunitoSans(
+                        fontSize: 13,
+                        color: TerraTheme.neutral500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 4, 24, 12)
+                
+              ),
+              const Divider(height: 1, color: TerraTheme.olive100),
+              Expanded(
+                child: ListView.separated(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                  itemCount: docs.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final doc = docs[index];
+                    final status = _docStatusLabel(doc);
+                    final statusColor = _docStatusColor(status);
+                    return GestureDetector(
+                      onTap: () {
+                        Navigator.pop(context);
+                        _showDocDetails(doc);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0x1A3D4A2A)),
+                        ),
+                        child: Row(
+                          children: [
+                            // Order number badge
+                            Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                color: TerraTheme.olive100,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '${index + 1}',
+                                  style: GoogleFonts.nunitoSans(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    color: TerraTheme.primary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: TerraTheme.olive100,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                _categoryIcon(doc['categoryCode']),
+                                color: TerraTheme.primary,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    doc['name'] ?? 'Document',
+                                    style: GoogleFonts.nunitoSans(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: TerraTheme.olive900,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    doc['category'] ?? '',
+                                    style: GoogleFonts.nunitoSans(
+                                      fontSize: 12,
+                                      color: TerraTheme.neutral500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: statusColor.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(50),
+                              ),
+                              child: Text(
+                                status,
+                                style: GoogleFonts.nunitoSans(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: statusColor,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _showDocDetails(Map<String, dynamic> doc) {
@@ -444,49 +633,26 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
             Row(
               children: [
                 Expanded(
-                  child: OutlinedButton.icon(
+                  child: ElevatedButton.icon(
                     onPressed: () {
                       Navigator.pop(context);
                       _handleView(doc);
                     },
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: TerraTheme.olive900,
-                      side: const BorderSide(color: TerraTheme.olive100),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: TerraTheme.primary,
+                      foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
+                      elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(50),
                       ),
                     ),
                     icon: const Icon(Icons.visibility_outlined, size: 18),
                     label: Text(
-                      'View',
+                      'Open Document',
                       style: GoogleFonts.nunitoSans(
                         fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _handleDownload(doc);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: TerraTheme.gold500,
-                      foregroundColor: TerraTheme.charcoal800,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(50),
-                      ),
-                      elevation: 0,
-                    ),
-                    icon: const Icon(Icons.download_rounded, size: 18),
-                    label: Text(
-                      'Download',
-                      style: GoogleFonts.nunitoSans(
-                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
                       ),
                     ),
                   ),
@@ -683,6 +849,200 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
     );
   }
 
+  void _showFilterBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: TerraTheme.olive100,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Text(
+              'Filter by Status',
+              style: GoogleFonts.nunitoSans(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: TerraTheme.olive900,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ...[
+              {'label': 'All', 'value': null},
+              {'label': 'Expired', 'value': 'expired'},
+              {'label': 'Expiring Soon', 'value': 'expiring_soon'},
+              {'label': 'Active', 'value': 'active'},
+            ].map(
+              (option) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() => _selectedStatusFilter = option['value']);
+                    Navigator.pop(context);
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _selectedStatusFilter == option['value']
+                          ? TerraTheme.gold200
+                          : TerraTheme.olive100,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      option['label'] as String,
+                      style: GoogleFonts.nunitoSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: TerraTheme.olive900,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Map<String, List<Map<String, dynamic>>> _groupedDocuments(
+    List<Map<String, dynamic>> docs,
+  ) {
+    final Map<String, List<Map<String, dynamic>>> grouped = {};
+    final isIndiv = ref.read(isIndividualProvider);
+
+    // Sort docs within a bucket by their saved order_index (0-based per owner,
+    // set by the web app's drag-and-drop within that owner's section).
+    List<Map<String, dynamic>> sortedByIndex(List<Map<String, dynamic>> list) {
+      final copy = [...list];
+      copy.sort(
+        (a, b) => (a['orderIndex'] as int? ?? 0)
+            .compareTo(b['orderIndex'] as int? ?? 0),
+      );
+      return copy;
+    }
+
+    // Special grouping for "All Docs" view in individual user mode
+    if (_selectedCategoryGroup == null && isIndiv) {
+      final myDocs = <Map<String, dynamic>>[];
+      final familyDocsByMember = <String, List<Map<String, dynamic>>>{};
+
+      for (final doc in docs) {
+        final group = doc['groupType'] as String? ?? '';
+        if (group == 'family') {
+          myDocs.add(doc);
+        } else if (group == 'relative') {
+          final memberName = doc['owner']?.toString() ?? 'Unknown Member';
+          familyDocsByMember.putIfAbsent(memberName, () => []);
+          familyDocsByMember[memberName]!.add(doc);
+        }
+      }
+
+      grouped['My Documents'] = sortedByIndex(myDocs);
+
+      // Member sections: alphabetical by name (matches web app rendering)
+      final sortedMembers = familyDocsByMember.keys.toList()..sort();
+      for (final name in sortedMembers) {
+        grouped['Family Documents - $name'] =
+            sortedByIndex(familyDocsByMember[name]!);
+      }
+
+      return grouped;
+    }
+
+    // Special grouping for "All Docs" view in corporate user mode
+    if (_selectedCategoryGroup == null && !isIndiv) {
+      final companyDocsBySponsor = <String, List<Map<String, dynamic>>>{};
+      final partnerDocsByOwner = <String, List<Map<String, dynamic>>>{};
+      final generalCompanyDocs = <Map<String, dynamic>>[];
+
+      for (final doc in docs) {
+        final group = doc['groupType'] as String? ?? '';
+        if (group == 'company') {
+          final sponsorName = doc['ownerName']?.toString();
+          if (sponsorName != null && sponsorName.isNotEmpty) {
+            companyDocsBySponsor.putIfAbsent(sponsorName, () => []);
+            companyDocsBySponsor[sponsorName]!.add(doc);
+          } else {
+            generalCompanyDocs.add(doc);
+          }
+        } else if (group == 'partner') {
+          final ownerName = doc['ownerName']?.toString() ?? 'Unknown Partner';
+          partnerDocsByOwner.putIfAbsent(ownerName, () => []);
+          partnerDocsByOwner[ownerName]!.add(doc);
+        }
+        // Employee docs excluded from All Docs view
+      }
+
+      // General company docs (no sponsor) first
+      if (generalCompanyDocs.isNotEmpty) {
+        grouped['Company Documents'] = sortedByIndex(generalCompanyDocs);
+      }
+
+      // Sponsor buckets: alphabetical by sponsor name (matches web)
+      final sortedSponsors = companyDocsBySponsor.keys.toList()..sort();
+      for (final name in sortedSponsors) {
+        grouped['Company Documents - $name'] =
+            sortedByIndex(companyDocsBySponsor[name]!);
+      }
+
+      // Partner owner buckets: alphabetical by owner name (matches web)
+      final sortedPartnerOwners = partnerDocsByOwner.keys.toList()..sort();
+      for (final name in sortedPartnerOwners) {
+        grouped['Partner Documents - $name'] =
+            sortedByIndex(partnerDocsByOwner[name]!);
+      }
+
+      return grouped;
+    }
+
+    // Specific category views (Company Docs chip / Family Docs chip / etc.)
+    final buckets = <String, List<Map<String, dynamic>>>{};
+    for (final doc in docs) {
+      String groupKey;
+      if (_selectedCategoryGroup == 'company') {
+        final ownerName = doc['ownerName']?.toString();
+        groupKey = ownerName != null && ownerName.isNotEmpty
+            ? ownerName
+            : 'Company Documents';
+      } else {
+        groupKey = doc['owner']?.toString() ?? 'Unknown';
+      }
+      buckets.putIfAbsent(groupKey, () => []);
+      buckets[groupKey]!.add(doc);
+    }
+
+    // Sort section headers alphabetically, docs within each section by orderIndex
+    final sortedKeys = buckets.keys.toList()..sort();
+    for (final key in sortedKeys) {
+      grouped[key] = sortedByIndex(buckets[key]!);
+    }
+
+    return grouped;
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen<String?>(selectedCompanyIdProvider, (previous, next) {
@@ -702,9 +1062,47 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
     }
 
     // Filter logic
-    final displayedDocs = _documents.where((doc) {
+    final isIndiv = ref.read(isIndividualProvider);
+    var displayedDocs = _documents.where((doc) {
       final group = doc['groupType'] as String? ?? '';
-      // When "All Docs" is selected (null), exclude employee docs for both account types
+
+      // When "All Docs" is selected (null) for individual users, include both family and relative docs
+      if (_selectedCategoryGroup == null && isIndiv) {
+        final matchGroup = group == 'family' || group == 'relative';
+        final matchSearch =
+            _searchQuery.isEmpty ||
+            (doc['name'] ?? '').toLowerCase().contains(
+              _searchQuery.toLowerCase(),
+            );
+        final status = _docStatusLabel(doc);
+        final matchStatus =
+            _selectedStatusFilter == null ||
+            (_selectedStatusFilter == 'expired' && status == 'Expired') ||
+            (_selectedStatusFilter == 'expiring_soon' &&
+                status == 'Expiring Soon') ||
+            (_selectedStatusFilter == 'active' && status == 'Active');
+        return matchGroup && matchSearch && matchStatus;
+      }
+
+      // When "All Docs" is selected (null) for corporate users, include company and partner docs only
+      if (_selectedCategoryGroup == null && !isIndiv) {
+        final matchGroup = group == 'company' || group == 'partner';
+        final matchSearch =
+            _searchQuery.isEmpty ||
+            (doc['name'] ?? '').toLowerCase().contains(
+              _searchQuery.toLowerCase(),
+            );
+        final status = _docStatusLabel(doc);
+        final matchStatus =
+            _selectedStatusFilter == null ||
+            (_selectedStatusFilter == 'expired' && status == 'Expired') ||
+            (_selectedStatusFilter == 'expiring_soon' &&
+                status == 'Expiring Soon') ||
+            (_selectedStatusFilter == 'active' && status == 'Active');
+        return matchGroup && matchSearch && matchStatus;
+      }
+
+      // For specific category selection, use original logic
       if (_selectedCategoryGroup == null && group == 'employee') return false;
       final matchCat =
           _selectedCategoryGroup == null || group == _selectedCategoryGroup;
@@ -717,8 +1115,20 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
           (doc['name'] ?? '').toLowerCase().contains(
             _searchQuery.toLowerCase(),
           );
-      return matchCat && matchPartner && matchSearch;
+      final status = _docStatusLabel(doc);
+      final matchStatus =
+          _selectedStatusFilter == null ||
+          (_selectedStatusFilter == 'expired' && status == 'Expired') ||
+          (_selectedStatusFilter == 'expiring_soon' &&
+              status == 'Expiring Soon') ||
+          (_selectedStatusFilter == 'active' && status == 'Active');
+
+      return matchCat && matchPartner && matchSearch && matchStatus;
     }).toList();
+
+    // Documents are already ordered by order_index from the DB queries,
+    // preserving the drag-and-drop arrangement set in the web app.
+    // No additional client-side sort is applied here.
 
     // Get sorted list of partner owner names
     final partnerOwnerOptions = <String>{};
@@ -764,7 +1174,11 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(10),
                     boxShadow: const [
-                      BoxShadow(color: Color(0x1A3D4A2A), blurRadius: 6, offset: Offset(0, 2)),
+                      BoxShadow(
+                        color: Color(0x1A3D4A2A),
+                        blurRadius: 6,
+                        offset: Offset(0, 2),
+                      ),
                     ],
                   ),
                   padding: const EdgeInsets.all(4),
@@ -793,23 +1207,67 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Documents',
-                    style: GoogleFonts.nunitoSans(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
-                      color: TerraTheme.olive900,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    isIndividual
-                        ? 'Secure access to your personal and family legal records.'
-                        : 'Secure access to your corporate legal records.',
-                    style: GoogleFonts.nunitoSans(
-                      fontSize: 14,
-                      color: TerraTheme.neutral500,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Documents',
+                              style: GoogleFonts.nunitoSans(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w700,
+                                color: TerraTheme.olive900,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              isIndividual
+                                  ? 'Secure access to your personal and family legal records.'
+                                  : 'Secure access to your corporate legal records.',
+                              style: GoogleFonts.nunitoSans(
+                                fontSize: 14,
+                                color: TerraTheme.neutral500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      GestureDetector(
+                        onTap: _showFilterBottomSheet,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: TerraTheme.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Filter',
+                                style: GoogleFonts.nunitoSans(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: TerraTheme.primary,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const Icon(
+                                Icons.tune_rounded,
+                                color: TerraTheme.primary,
+                                size: 16,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const CompanySelectorChip(),
 
@@ -1012,8 +1470,146 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
                 ),
               );
             })
+          else if ((_selectedCategoryGroup == 'relative') ||
+              (_selectedCategoryGroup == 'company') ||
+              // For individual users in "All Docs" view, show grouped structure
+              (_selectedCategoryGroup == null && isIndiv) ||
+              // For corporate users in "All Docs" view, show hierarchical grouping
+              (_selectedCategoryGroup == null && !isIndiv))
+            // Grouped by category (Family Documents - Member Name, etc.)
+            ..._groupedDocuments(displayedDocs).entries.map((entry) {
+              final isMyDocs = entry.key == 'My Documents';
+              final isFamilyDoc = entry.key.startsWith('Family Documents -');
+              final isCompanyDoc = entry.key.startsWith('Company Documents -');
+              final isPartnerDoc = entry.key.startsWith('Partner Documents -');
+              final isGeneralCompany = entry.key == 'Company Documents';
+
+              // Determine icon and color based on document type
+              IconData sectionIcon;
+              Color containerColor;
+              String displayText;
+
+              if (isMyDocs) {
+                sectionIcon = Icons.folder_outlined;
+                containerColor = TerraTheme.gold500.withOpacity(0.2);
+                displayText = entry.key;
+              } else if (isFamilyDoc) {
+                sectionIcon = Icons.people_outline;
+                containerColor = TerraTheme.olive100;
+                displayText = entry.key.replaceFirst('Family Documents - ', '');
+              } else if (isCompanyDoc) {
+                sectionIcon = Icons.business_outlined;
+                containerColor = TerraTheme.gold500.withOpacity(0.2);
+                displayText = entry.key.replaceFirst(
+                  'Company Documents - ',
+                  '',
+                );
+              } else if (isGeneralCompany) {
+                sectionIcon = Icons.business_outlined;
+                containerColor = TerraTheme.gold500.withOpacity(0.2);
+                displayText = entry.key;
+              } else if (isPartnerDoc) {
+                sectionIcon = Icons.person_outline;
+                containerColor = TerraTheme.olive100;
+                displayText = entry.key.replaceFirst(
+                  'Partner Documents - ',
+                  '',
+                );
+              } else {
+                sectionIcon = Icons.folder_outlined;
+                containerColor = TerraTheme.olive100;
+                displayText = entry.key;
+              }
+
+              return SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Section header
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: containerColor,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              sectionIcon,
+                              color: TerraTheme.primary,
+                              size: 18,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            displayText,
+                            style: GoogleFonts.nunitoSans(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: TerraTheme.olive900,
+                            ),
+                          ),
+                          const Spacer(),
+                          // Manage button for grouped documents
+                          if (isCompanyDoc || isPartnerDoc || isFamilyDoc) ...[
+                            GestureDetector(
+                              onTap: () {
+                                // Navigate to manage documents view for this group
+                                _navigateToManageDocuments(
+                                  entry.value,
+                                  displayText,
+                                );
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: TerraTheme.primary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'Manage',
+                                      style: GoogleFonts.nunitoSans(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: TerraTheme.primary,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Icon(
+                                      Icons.arrow_forward_rounded,
+                                      color: TerraTheme.primary,
+                                      size: 14,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    // Docs for this section
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                      child: Column(
+                        children: entry.value.map(_buildDocCard).toList(),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            })
           else
-            // Flat list for non-partner views or single partner view
+            // Flat list for "All Docs" view
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
               sliver: SliverList(

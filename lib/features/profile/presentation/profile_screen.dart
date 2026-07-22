@@ -425,6 +425,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         errorMessage = null;
                       });
                       try {
+                        // Verify current password by attempting to sign in
+                        final currentUser = supabase.auth.currentUser;
+                        if (currentUser?.email == null) {
+                          throw Exception('No user email found');
+                        }
+
+                        try {
+                          await supabase.auth.signInWithPassword(
+                            email: currentUser!.email!,
+                            password: currentPasswordController.text,
+                          );
+                        } catch (e) {
+                          setState(() {
+                            errorMessage = 'Current password is incorrect';
+                          });
+                          return;
+                        }
+
+                        // If verification passed, update password
                         await supabase.auth.updateUser(
                           UserAttributes(password: newPasswordController.text),
                         );
