@@ -8,6 +8,9 @@ final selectedCompanyIdProvider = StateProvider<String?>((ref) => null);
 // List of companies available to the logged-in client user account
 final availableCompaniesProvider = StateProvider<List<Map<String, dynamic>>>((ref) => []);
 
+// User profile including group information
+final userProfileProvider = StateProvider<Map<String, dynamic>?>((ref) => null);
+
 // Returns true if the active company is an Individual/Family client
 final isIndividualProvider = Provider<bool>((ref) {
   final selectedId = ref.watch(selectedCompanyIdProvider);
@@ -41,7 +44,7 @@ Future<void> fetchUserCompanies(WidgetRef ref) async {
     try {
       profileRes = await supabase
           .from('users')
-          .select('company_id, group_id, status, is_blocked')
+          .select('company_id, group_id, status, is_blocked, company_groups:group_id(id, name)')
           .eq('id', userId)
           .single();
     } catch (_) {
@@ -52,6 +55,9 @@ Future<void> fetchUserCompanies(WidgetRef ref) async {
           .eq('id', userId)
           .single();
     }
+
+    // Store user profile for access across the app
+    ref.read(userProfileProvider.notifier).state = profileRes;
 
     // Blocked if either field says so
     final blocked =

@@ -11,23 +11,30 @@ class CompanySelectorChip extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final companies = ref.watch(availableCompaniesProvider);
     final selectedId = ref.watch(selectedCompanyIdProvider);
+    final userProfile = ref.watch(userProfileProvider);
 
     if (companies.length <= 1) {
       return const SizedBox.shrink(); // Standalone company: hide selector
     }
 
+    // Determine the label for combined view
+    String allCompaniesLabel = 'All Companies';
+    if (userProfile != null && userProfile['company_groups'] != null) {
+      allCompaniesLabel = userProfile['company_groups']['name'] ?? 'All Companies';
+    }
+
     final activeCompany = companies.firstWhere(
       (c) => c['id'] == selectedId,
-      orElse: () => {'name': 'All Companies'},
+      orElse: () => {'name': allCompaniesLabel},
     );
-    final String labelName = selectedId == null ? 'All Companies' : activeCompany['name'];
+    final String labelName = selectedId == null ? allCompaniesLabel : activeCompany['name'];
 
     return Padding(
       padding: const EdgeInsets.only(top: 8.0, bottom: 16.0),
       child: UnconstrainedBox(
         alignment: Alignment.centerLeft,
         child: InkWell(
-          onTap: () => _showCompanySelector(context, ref, companies, selectedId),
+          onTap: () => _showCompanySelector(context, ref, companies, selectedId, allCompaniesLabel),
           borderRadius: BorderRadius.circular(50),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -59,7 +66,7 @@ class CompanySelectorChip extends ConsumerWidget {
     );
   }
 
-  void _showCompanySelector(BuildContext context, WidgetRef ref, List<Map<String, dynamic>> companies, String? selectedId) {
+  void _showCompanySelector(BuildContext context, WidgetRef ref, List<Map<String, dynamic>> companies, String? selectedId, String allCompaniesLabel) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -96,11 +103,11 @@ class CompanySelectorChip extends ConsumerWidget {
               child: ListView(
                 shrinkWrap: true,
                 children: [
-                  // Option: All Companies
+                  // Option: All Companies (or Group Name)
                   ListTile(
                     leading: const Icon(Icons.grid_view_rounded, color: TerraTheme.primary),
                     title: Text(
-                      'All Companies (Combined View)',
+                      '$allCompaniesLabel (Combined View)',
                       style: GoogleFonts.nunitoSans(
                         fontWeight: selectedId == null ? FontWeight.w800 : FontWeight.w600,
                         color: selectedId == null ? TerraTheme.primary : TerraTheme.olive900,

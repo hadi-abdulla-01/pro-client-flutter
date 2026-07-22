@@ -31,14 +31,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       final res = await supabase
           .from('users')
-          .select('*, companies(*), roles(name)')
+          .select('*, companies(*), roles(name), company_groups:group_id(id, name)')
           .eq('id', userId)
           .single();
 
       _userProfile = res;
       _company = res['companies'];
+      
+      // If user belongs to a company group, use group name instead of company name
+      if (res['company_groups'] != null) {
+        _company = {
+          ...?_company,
+          'name': res['company_groups']['name'],
+          'is_group': true,
+        };
+      }
+      
       debugPrint('profile photo_url: ${res['photo_url']}');
       debugPrint('company logo_url: ${res['companies']?['logo_url']}');
+      debugPrint('group info: ${res['company_groups']}');
     } catch (e) {
       debugPrint("Error loading profile: $e");
     } finally {

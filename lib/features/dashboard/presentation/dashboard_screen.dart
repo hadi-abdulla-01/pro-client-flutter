@@ -75,9 +75,24 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
         targetCompanyIds = [selectedId];
         _company = companies.firstWhere((c) => c['id'] == selectedId);
       } else {
+        // Combined view - check if user belongs to a group
         targetCompanyIds = companies.map((c) => c['id'] as String).toList();
         final isIndiv = companies.any((c) => c['entity_type'] == 'individual');
-        _company = {'name': isIndiv ? 'All Families' : 'All Companies'};
+        
+        // Fetch user's group information
+        final userRes = await supabase
+            .from('users')
+            .select('group_id, company_groups:group_id(name)')
+            .eq('id', userId)
+            .single();
+        
+        if (userRes['company_groups'] != null && userRes['company_groups']['name'] != null) {
+          // User belongs to a group - use group name
+          _company = {'name': userRes['company_groups']['name']};
+        } else {
+          // No group - use default text
+          _company = {'name': isIndiv ? 'All Families' : 'All Companies'};
+        }
       }
 
       if (targetCompanyIds.isNotEmpty) {
